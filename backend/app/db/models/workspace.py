@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
+from app.db.base import Base, TimestampMixin
 from sqlalchemy import JSON, Boolean, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
-
-from app.db.base import Base, TimestampMixin
-
 
 
 class ChartLayout(Base, TimestampMixin):

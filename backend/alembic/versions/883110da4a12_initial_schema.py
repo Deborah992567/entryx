@@ -1,7 +1,7 @@
 """initial schema
 
 Revision ID: 883110da4a12
-Revises: 
+Revises:
 Create Date: 2026-08-02 19:22:11.713943
 """
 
@@ -11,7 +11,6 @@ from collections.abc import Sequence
 
 import sqlalchemy as sa
 from alembic import op
-
 
 revision: str = '883110da4a12'
 down_revision: str | None = None

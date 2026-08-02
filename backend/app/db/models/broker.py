@@ -6,11 +6,9 @@ domains. Broker credentials are stored encrypted and never exposed via API.
 
 from __future__ import annotations
 
+from app.db.base import Base, TimestampMixin
 from sqlalchemy import JSON, Boolean, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-
-from app.db.base import Base, TimestampMixin
-
 
 
 class Broker(Base, TimestampMixin):

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
+from app.db.base import Base, TimestampMixin
 from sqlalchemy import (
     DateTime,
     ForeignKey,
@@ -13,8 +14,6 @@ from sqlalchemy import (
     Text,
 )
 from sqlalchemy.orm import Mapped, mapped_column
-
-from app.db.base import Base, TimestampMixin
 
 
 class Order(Base, TimestampMixin):

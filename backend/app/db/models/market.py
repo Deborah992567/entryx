@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
+from app.db.base import Base
 from sqlalchemy import (
     BigInteger,
     Boolean,
@@ -15,8 +16,6 @@ from sqlalchemy import (
     UniqueConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column
-
-from app.db.base import Base
 
 
 class Symbol(Base):
@@ -59,7 +58,7 @@ class Candle(Base):
     ts: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     o: Mapped[float] = mapped_column(Numeric(24, 8), nullable=False)
     h: Mapped[float] = mapped_column(Numeric(24, 8), nullable=False)
-    l: Mapped[float] = mapped_column(Numeric(24, 8), nullable=False)
+    low: Mapped[float] = mapped_column("l", Numeric(24, 8), nullable=False)
     c: Mapped[float] = mapped_column(Numeric(24, 8), nullable=False)
     v: Mapped[float] = mapped_column(Numeric(24, 2), default=0)
 

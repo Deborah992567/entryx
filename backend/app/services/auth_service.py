@@ -6,15 +6,15 @@ All auth events are written to the audit log with sanitized detail.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import jwt
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core import security
-from app.core.config import Settings, get_settings
-from app.core.exceptions import ConflictError, NotFoundError, UnauthorizedError
+from app.core.config import get_settings
+from app.core.exceptions import ConflictError, UnauthorizedError
 from app.db.models.user import RefreshToken, User
 from app.services import audit
 
@@ -23,7 +23,6 @@ _ERR_ALREADY_REGISTERED = "an account with this email already exists"
 
 
 def register(db: Session, *, email: str, password: str, name: str, ip: str = "") -> User:
-    settings = get_settings()
     existing = db.scalar(select(User).where(User.email == email.lower()))
     if existing:
         raise ConflictError(_ERR_ALREADY_REGISTERED)
@@ -79,8 +78,8 @@ def refresh(db: Session, *, raw_refresh: str, ip: str = "") -> dict:
     )
     if not token:
         raise UnauthorizedError("invalid or expired refresh token")
-    now = datetime.now(timezone.utc)
-    if token.expires_at.replace(tzinfo=timezone.utc) < now:
+    now = datetime.now(UTC)
+    if token.expires_at.replace(tzinfo=UTC) < now:
         raise UnauthorizedError("refresh token expired")
     user = db.get(User, token.user_id)
     if not user or not user.is_active:
@@ -113,7 +112,7 @@ def logout(db: Session, *, raw_refresh: str, user_id: int, ip: str = "") -> None
     token_hash = security.sha256_hex(raw_refresh)
     token = db.scalar(select(RefreshToken).where(RefreshToken.token_hash == token_hash))
     if token and token.user_id == user_id:
-        token.revoked_at = datetime.now(timezone.utc)
+        token.revoked_at = datetime.now(UTC)
         db.commit()
     audit.record(db, action="auth.logout", user_id=user_id, entity="users", entity_id=user_id, ip=ip)
 

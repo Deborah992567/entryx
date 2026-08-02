@@ -11,7 +11,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import secrets
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import jwt
@@ -48,7 +48,7 @@ def _secret(settings: Settings) -> bytes:
 def create_access_token(
     subject: str, settings: Settings, extra: dict[str, Any] | None = None
 ) -> str:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     payload: dict[str, Any] = {
         "sub": subject,
         "type": TOKEN_TYPE_ACCESS,
@@ -63,7 +63,7 @@ def create_access_token(
 def create_refresh_token(settings: Settings) -> tuple[str, str, datetime]:
     """Return (raw_token, token_hash, expires_at). Only the hash is persisted."""
     raw = secrets.token_urlsafe(48)
-    expires_at = datetime.now(timezone.utc) + timedelta(days=settings.refresh_token_expire_days)
+    expires_at = datetime.now(UTC) + timedelta(days=settings.refresh_token_expire_days)
     return raw, sha256_hex(raw), expires_at
 
 
