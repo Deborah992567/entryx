@@ -7,21 +7,21 @@ Legend: `[x]` done · `[~]` in progress · `[ ]` planned
 
 ## PHASE 1 — Foundation
 
-- [~] Project architecture & contracts (`docs/`)
+- [x] Project architecture & contracts (`docs/`)
 - [x] Repo + GitHub CI scaffolding
-- [ ] Backend core: config, logging, security (JWT/Argon2), exceptions
-- [ ] Database: SQLAlchemy models + Alembic migrations (MariaDB; SQLite dev fallback)
-- [ ] Auth API: register / login / refresh / me / logout (+ rate limiting, audit log)
-- [ ] Workspace layout persistence API (`chart_layouts`)
-- [ ] Health + status API; WebSocket hub skeleton with JWT auth
-- [ ] Desktop shell: Flutter app, TopBar, workspace dock system
+- [x] Backend core: config, logging, security (JWT/Argon2), exceptions
+- [x] Database: SQLAlchemy models + Alembic migrations (MariaDB; SQLite dev fallback)
+- [x] Auth API: register / login / refresh / me / logout (+ rate limiting, audit log)
+- [x] Workspace layout persistence API (`chart_layouts`)
+- [x] Health + status API; WebSocket hub skeleton with JWT auth
+- [x] Desktop shell: Flutter app, TopBar, workspace dock system
   (resize/collapse/rearrange/persist), connection status
-- [ ] Placeholder panels: MarketWatch, Chart, AI Copilot, Trading Terminal
-- [ ] Auth UI: login / register screen, token refresh, secure storage
+- [x] Placeholder panels: MarketWatch, Chart, AI Copilot, Trading Terminal
+- [x] Auth UI: login / register screen, token refresh, secure storage
 
 ## PHASE 2 — Market data + Paper broker + Real-time
 
-- [ ] `MarketDataProvider` interface + simulated deterministic provider
+- [~] `MarketDataProvider` interface + simulated deterministic provider
 - [ ] `BrokerAdapter` interface + `PaperBroker` (virtual accounts, deposits, fills)
 - [ ] Market Watch panel: symbols, bid/ask/spread/change/volume, search/favorites/categories
 - [ ] WebSockets: tick/candle broadcasting to panels; account/P&L events
@@ -99,8 +99,8 @@ Legend: `[x]` done · `[~]` in progress · `[ ]` planned
 
 | Phase | Title | Status |
 |---|---|---|
-| 1 | Foundation | in progress |
-| 2 | Market data + paper broker + real-time | planned |
+| 1 | Foundation | done |
+| 2 | Market data + paper broker + real-time | in progress |
 | 3 | Chart engine + indicators + drawings | planned |
 | 4 | Trading engine + risk | planned |
 | 5 | Strategy + backtesting + optimization | planned |
