@@ -2,12 +2,14 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../core/api_client.dart';
 import '../core/token_store.dart';
 import '../core/ws_client.dart';
 import '../features/auth/auth_screen.dart';
 import '../features/auth/auth_store.dart';
+import '../features/market/market_watch_store.dart';
 import '../features/shell/entryx_shell.dart';
 import '../features/shell/system_status_store.dart';
 import '../features/shell/workspace/workspace_store.dart';
@@ -27,6 +29,7 @@ class _EntryXAppState extends State<EntryXApp> {
   late final AuthStore _auth;
   late final SystemStatusStore _status;
   late final WorkspaceStore _workspace;
+  late final MarketWatchStore _marketWatch;
 
   @override
   void initState() {
@@ -37,11 +40,13 @@ class _EntryXAppState extends State<EntryXApp> {
     _auth = AuthStore(api: _api, tokens: _tokens, ws: _ws);
     _status = SystemStatusStore(api: _api, ws: _ws);
     _workspace = WorkspaceStore(api: _api);
+    _marketWatch = MarketWatchStore(api: _api, ws: _ws);
     _auth.restore();
   }
 
   @override
   void dispose() {
+    _marketWatch.dispose();
     _workspace.dispose();
     _status.dispose();
     _auth.dispose();
@@ -55,16 +60,23 @@ class _EntryXAppState extends State<EntryXApp> {
       title: 'EntryX',
       debugShowCheckedModeBanner: false,
       theme: EntryXTheme.dark(),
-      home: ListenableBuilder(
-        listenable: _auth,
-        builder: (context, _) {
-          return switch (_auth.status) {
-            AuthStatus.unknown => const _BootSplash(),
-            AuthStatus.authenticated =>
-              EntryXShell(auth: _auth, statusStore: _status, workspace: _workspace),
-            AuthStatus.unauthenticated => AuthScreen(store: _auth),
-          };
-        },
+      home: MultiProvider(
+        providers: [
+          Provider<ApiClient>.value(value: _api),
+          ChangeNotifierProvider.value(value: _auth),
+          ChangeNotifierProvider.value(value: _marketWatch),
+        ],
+        child: ListenableBuilder(
+          listenable: _auth,
+          builder: (context, _) {
+            return switch (_auth.status) {
+              AuthStatus.unknown => const _BootSplash(),
+              AuthStatus.authenticated =>
+                EntryXShell(auth: _auth, statusStore: _status, workspace: _workspace),
+              AuthStatus.unauthenticated => AuthScreen(store: _auth),
+            };
+          },
+        ),
       ),
     );
   }

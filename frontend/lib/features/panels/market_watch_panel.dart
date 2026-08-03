@@ -1,41 +1,31 @@
-/// Market Watch panel — symbols, bid/ask/spread/change.
+/// Market Watch panel — symbols, bid/ask/spread/change/volume with live ticks,
+/// search, category filter and favorites.
 ///
-/// Phase 2 wires this to the real-time market data provider. Until then the
-/// table structure is real but values are marked unavailable (no fake data).
+/// Data flows from the backend through `MarketWatchStore`: the REST catalog and
+/// real-time `market.watch` / `market.tick` events. No fake values are shown.
 library;
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../../app/theme.dart';
+import '../../core/models.dart';
+import '../market/market_watch_store.dart';
 
-class MarketWatchPanel extends StatefulWidget {
+class MarketWatchPanel extends StatelessWidget {
   const MarketWatchPanel({super.key});
 
   @override
-  State<MarketWatchPanel> createState() => _MarketWatchPanelState();
-}
-
-class _MarketWatchPanelState extends State<MarketWatchPanel> {
-  String _query = '';
-
-  static const _watchlist = [
-    'XAUUSD',
-    'EURUSD',
-    'GBPUSD',
-    'USDJPY',
-    'BTCUSD',
-    'NAS100',
-  ];
-
-  @override
   Widget build(BuildContext context) {
-    final matches = _watchlist.where((s) => s.contains(_query.toUpperCase())).toList();
+    final store = context.watch<MarketWatchStore>();
+    final symbols = store.visibleSymbols;
+
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.all(6),
+          padding: const EdgeInsets.fromLTRB(6, 6, 6, 4),
           child: TextField(
-            onChanged: (v) => setState(() => _query = v),
+            onChanged: store.setQuery,
             decoration: const InputDecoration(
               hintText: 'Search symbols…',
               prefixIcon: Icon(Icons.search, size: 16),
@@ -43,32 +33,70 @@ class _MarketWatchPanelState extends State<MarketWatchPanel> {
             ),
           ),
         ),
-        Row(
-          children: const [
+        SizedBox(
+          height: 28,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            children: [
+              for (final category in store.categories)
+                Padding(
+                  padding: const EdgeInsets.only(right: 4),
+                  child: ChoiceChip(
+                    label: Text(category.toUpperCase(),
+                        style: const TextStyle(fontSize: 10)),
+                    selected: store.category == category,
+                    onSelected: (_) => store.setCategory(category),
+                    visualDensity: VisualDensity.compact,
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    labelPadding: const EdgeInsets.symmetric(horizontal: 8),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        const Row(
+          children: [
             Expanded(flex: 3, child: _Header('Symbol')),
             Expanded(flex: 2, child: _Header('Bid')),
             Expanded(flex: 2, child: _Header('Ask')),
             Expanded(flex: 1, child: _Header('Sprd')),
             Expanded(flex: 2, child: _Header('Chg %')),
+            SizedBox(width: 24),
           ],
         ),
         const Divider(height: 1),
         Expanded(
-          child: ListView.separated(
-            itemCount: matches.length,
-            separatorBuilder: (_, _) => const Divider(height: 1),
-            itemBuilder: (context, index) {
-              final symbol = matches[index];
-              return _SymbolRow(symbol: symbol, connected: false);
-            },
-          ),
+          child: symbols.isEmpty
+              ? const Center(
+                  child: Text('No symbols match',
+                      style: TextStyle(color: EntryXColors.textDim, fontSize: 11)),
+                )
+              : ListView.separated(
+                  itemCount: symbols.length,
+                  separatorBuilder: (_, _) => const Divider(height: 1),
+                  itemBuilder: (context, index) {
+                    final symbol = symbols[index];
+                    return _SymbolRow(
+                      symbol: symbol,
+                      quote: store.quoteFor(symbol.symbol),
+                      favorite: store.isFavorite(symbol.symbol),
+                      connected: store.connected,
+                      onToggleFavorite: () => store.toggleFavorite(symbol.symbol),
+                    );
+                  },
+                ),
         ),
         const Divider(height: 1),
-        const Padding(
-          padding: EdgeInsets.all(6),
+        Padding(
+          padding: const EdgeInsets.all(6),
           child: Text(
-            'Market data: not connected — Phase 2 (simulated provider)',
-            style: TextStyle(color: EntryXColors.textDim, fontSize: 10),
+            store.error.isNotEmpty
+                ? store.error
+                : store.connected
+                    ? 'Market data: live (simulated provider)'
+                    : 'Market data: disconnected',
+            style: const TextStyle(color: EntryXColors.textDim, fontSize: 10),
           ),
         ),
       ],
@@ -90,13 +118,34 @@ class _Header extends StatelessWidget {
 }
 
 class _SymbolRow extends StatelessWidget {
-  const _SymbolRow({required this.symbol, required this.connected});
+  const _SymbolRow({
+    required this.symbol,
+    required this.quote,
+    required this.favorite,
+    required this.connected,
+    required this.onToggleFavorite,
+  });
 
-  final String symbol;
+  final SymbolInfo symbol;
+  final Quote? quote;
+  final bool favorite;
   final bool connected;
+  final VoidCallback onToggleFavorite;
 
   @override
   Widget build(BuildContext context) {
+    final q = quote;
+    final color = q == null
+        ? EntryXColors.textDim
+        : q.changePct >= 0
+            ? EntryXColors.up
+            : EntryXColors.down;
+
+    String fmt(double value) {
+      final fixed = value.toStringAsFixed(symbol.digits.clamp(1, 5));
+      return q == null ? '--' : fixed;
+    }
+
     return InkWell(
       onTap: () {
         // Phase 3: switch the active chart to this symbol.
@@ -105,15 +154,34 @@ class _SymbolRow extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
         child: Row(
           children: [
-            Expanded(flex: 3, child: Text(symbol, style: const TextStyle(fontSize: 11))),
-            Expanded(flex: 2, child: _cell('--')),
-            Expanded(flex: 2, child: _cell('--')),
-            Expanded(flex: 1, child: _cell('--')),
-            Expanded(flex: 2, child: _cell('--', color: EntryXColors.textDim)),
+            Expanded(flex: 3, child: Text(symbol.symbol,
+                style: const TextStyle(fontSize: 11))),
+            Expanded(flex: 2, child: _cell(fmt(q?.bid ?? 0))),
+            Expanded(flex: 2, child: _cell(fmt(q?.ask ?? 0))),
+            Expanded(flex: 1, child: _cell(q == null ? '--' : _spread(q.spread))),
+            Expanded(
+              flex: 2,
+              child: _cell(q == null ? '--' : '${q.changePct.toStringAsFixed(2)}%',
+                  color: color),
+            ),
+            IconButton(
+              visualDensity: VisualDensity.compact,
+              padding: EdgeInsets.zero,
+              iconSize: 14,
+              icon: Icon(favorite ? Icons.star : Icons.star_border,
+                  color: favorite ? EntryXColors.accentBright : EntryXColors.textDim),
+              onPressed: onToggleFavorite,
+            ),
           ],
         ),
       ),
     );
+  }
+
+  String _spread(double spread) {
+    if (spread <= 0) return '--';
+    if (spread < 0.01) return spread.toStringAsExponential(0);
+    return spread.toStringAsFixed(2);
   }
 
   Widget _cell(String text, {Color? color}) => Text(
