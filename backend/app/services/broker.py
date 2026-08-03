@@ -284,11 +284,21 @@ class PaperBroker(BrokerAdapter):
         info = self._provider.symbol_info(symbol)
         return price * info.contract_size * volume / self._account.leverage
 
-    def equity(self) -> float:
-        total_floating = 0.0
+    def margin_used(self) -> float:
+        total = 0.0
         for position in self._positions.values():
-            total_floating += self.floating_pnl(position, self._provider.quote(position.symbol))
-        return round(self._account.balance + total_floating, 2)
+            quote = self._provider.quote(position.symbol)
+            total += self.margin_required(position.symbol, position.volume, quote.bid)
+        return round(total, 2)
+
+    def floating_pnl_total(self) -> float:
+        total = 0.0
+        for position in self._positions.values():
+            total += self.floating_pnl(position, self._provider.quote(position.symbol))
+        return round(total, 2)
+
+    def equity(self) -> float:
+        return round(self._account.balance + self.floating_pnl_total(), 2)
 
     # -- internals ------------------------------------------------------------
 
