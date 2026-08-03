@@ -72,3 +72,60 @@ class Health {
                 )),
       );
 }
+
+class SymbolInfo {
+  const SymbolInfo({
+    required this.symbol,
+    required this.name,
+    required this.category,
+    required this.digits,
+    this.baseCurrency = '',
+    this.quoteCurrency = '',
+    this.tickSize = 0.00001,
+  });
+
+  final String symbol;
+  final String name;
+  final String category;
+  final String baseCurrency;
+  final String quoteCurrency;
+  final int digits;
+  final double tickSize;
+
+  factory SymbolInfo.fromJson(Map<String, dynamic> json) => SymbolInfo(
+        symbol: json['symbol'] as String,
+        name: json['name'] as String? ?? '',
+        category: json['category'] as String? ?? '',
+        baseCurrency: json['base_currency'] as String? ?? '',
+        quoteCurrency: json['quote_currency'] as String? ?? '',
+        digits: json['digits'] as int? ?? 5,
+        tickSize: (json['tick_size'] as num?)?.toDouble() ?? 0.00001,
+      );
+}
+
+class Quote {
+  const Quote({
+    required this.symbol,
+    required this.bid,
+    required this.ask,
+    this.spread = 0,
+    this.changePct = 0,
+    this.volume = 0,
+  });
+
+  final String symbol;
+  final double bid;
+  final double ask;
+  final double spread;
+  final double changePct;
+  final double volume;
+
+  factory Quote.fromJson(Map<String, dynamic> json) => Quote(
+        symbol: json['symbol'] as String? ?? '',
+        bid: (json['bid'] as num?)?.toDouble() ?? 0,
+        ask: (json['ask'] as num?)?.toDouble() ?? 0,
+        spread: (json['spread'] as num?)?.toDouble() ?? 0,
+        changePct: (json['change_pct'] as num?)?.toDouble() ?? 0,
+        volume: (json['volume'] as num?)?.toDouble() ?? 0,
+      );
+}
