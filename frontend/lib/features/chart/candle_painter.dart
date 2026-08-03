@@ -1,15 +1,16 @@
 /// Canvas chart engine: candlesticks, volume pane, price/time scales, grid,
-/// indicator overlays, bands, and a crosshair with OHLC readout.
+/// indicator overlays, bands, persistent drawings, and a crosshair with OHLC
+/// readout.
 ///
-/// Pure rendering: all geometry is derived from the visible window
-/// (`start`..`end`) plus explicit crosshair state, so the painter never owns
-/// data or gesture state.
+/// Pure rendering: geometry comes from [ChartGeometry], so the painter never
+/// owns data or gesture state.
 library;
 
 import 'dart:math' as math;
 
-import 'package:flutter/widgets.dart';
+import 'package:flutter/widgets.dart' hide Overlay;
 
+import 'chart_geometry.dart';
 import 'chart_models.dart' as models;
 
 class CandleChartPainter extends CustomPainter {
@@ -23,8 +24,10 @@ class CandleChartPainter extends CustomPainter {
     this.crosshairPrice,
     this.overlays = const [],
     this.bands = const [],
+    this.drawings = const [],
+    this.selectedDrawingId,
+    this.draft,
     this.lastPrice,
-    this.connected = true,
   });
 
   final List<models.ChartCandle> candles;
@@ -36,140 +39,103 @@ class CandleChartPainter extends CustomPainter {
   final double? crosshairPrice;
   final List<models.Overlay> overlays;
   final List<models.Bands> bands;
+  final List<models.ChartDrawing> drawings;
+  final int? selectedDrawingId;
+  final models.ChartDrawing? draft;
   final double? lastPrice;
-  final bool connected;
-
-  static const double priceWidth = 58;
-  static const double timeHeight = 20;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final chartRect =
-        Rect.fromLTRB(0, 0, size.width - priceWidth, size.height - timeHeight);
-    if (chartRect.width <= 0 || chartRect.height <= 0 || candles.isEmpty || start >= end) {
+    final geo = ChartGeometry(
+      size: size,
+      candles: candles,
+      start: start,
+      end: end,
+      overlays: overlays,
+      bands: bands,
+      lastPrice: lastPrice,
+    );
+    if (size.width <= ChartGeometry.priceWidth || size.height <= ChartGeometry.timeHeight) {
+      return;
+    }
+    if (!geo.hasData) {
       return;
     }
 
-    final volumeRect = Rect.fromLTWH(
-      0,
-      chartRect.bottom - chartRect.height * 0.22,
-      chartRect.width,
-      chartRect.height * 0.22,
-    );
-    final priceRect = Rect.fromLTRB(
-      0,
-      0,
-      chartRect.width,
-      volumeRect.top,
-    );
-
-    var minP = double.infinity;
-    var maxP = double.negativeInfinity;
-    for (var i = start; i < end; i++) {
-      final c = candles[i];
-      if (c.low < minP) minP = c.low;
-      if (c.h > maxP) maxP = c.h;
-    }
-    for (final o in overlays) {
-      _extendRange(o.series, start, end, (p) => minP = p < minP ? p : minP, (p) => maxP = p > maxP ? p : maxP);
-    }
-    for (final b in bands) {
-      for (final s in [b.mid, b.upper, b.lower]) {
-        _extendRange(s, start, end, (p) => minP = p < minP ? p : minP, (p) => maxP = p > maxP ? p : maxP);
-      }
-    }
-    final last = lastPrice;
-    if (last != null) {
-      if (last < minP) minP = last;
-      if (last > maxP) maxP = last;
-    }
-    if (!minP.isFinite) return;
-
-    final pad = (maxP - minP) * 0.06;
-    minP -= pad;
-    maxP += pad;
-    if (maxP <= minP) maxP = minP + 1;
-
-    final visibleCount = end - start;
-    final barWidth = priceRect.width / visibleCount;
-    final bodyWidth = math.max(1.0, math.min(14.0, barWidth * 0.72));
-
-    double yFor(double price) =>
-        priceRect.bottom - (price - minP) / (maxP - minP) * priceRect.height;
-
-    _drawGridAndScale(canvas, priceRect, minP, maxP, visibleCount, barWidth, yFor);
+    _drawGridAndScale(canvas, geo);
 
     var maxV = 0.0;
     for (var i = start; i < end; i++) {
       if (candles[i].v > maxV) maxV = candles[i].v;
     }
-    _drawVolume(canvas, volumeRect, barWidth, bodyWidth, maxV);
-    _drawCandles(canvas, priceRect, barWidth, bodyWidth, yFor);
+    _drawVolume(canvas, geo, maxV);
+    _drawCandles(canvas, geo);
     for (final b in bands) {
-      _drawBands(canvas, priceRect, barWidth, b, yFor);
+      _drawBands(canvas, geo, b);
     }
     for (final o in overlays) {
-      _drawLine(canvas, priceRect, barWidth, o.series, _colorForOverlay(o.label), yFor);
+      _drawLine(canvas, geo, o.series, _colorForOverlay(o.label));
     }
 
-    if (last != null) {
-      _drawLastPriceTag(canvas, priceRect, last, yFor(last));
+    if (lastPrice != null) {
+      _drawLastPriceTag(canvas, geo, lastPrice!);
+    }
+
+    for (final d in drawings) {
+      _drawDrawing(canvas, geo, d, selected: d.id == selectedDrawingId);
+    }
+    final currentDraft = draft;
+    if (currentDraft != null) {
+      _drawDrawing(canvas, geo, currentDraft, draft: true);
     }
 
     if (crosshairIndex != null) {
-      _drawCrosshair(canvas, priceRect, barWidth, crosshairIndex!, crosshairPrice, yFor, minP, maxP);
+      _drawCrosshair(canvas, geo, crosshairIndex!, crosshairPrice);
     }
 
-    _drawOhlc(canvas, crosshairIndex ?? end - 1);
+    _drawOhlc(canvas, geo, crosshairIndex ?? end - 1);
   }
 
   // ----------------------------------------------------------------------- scale
 
-  void _drawGridAndScale(
-    Canvas canvas,
-    Rect priceRect,
-    double minP,
-    double maxP,
-    int visibleCount,
-    double barWidth,
-    double Function(double) yFor,
-  ) {
+  void _drawGridAndScale(Canvas canvas, ChartGeometry geo) {
     final grid = Paint()
       ..color = const Color(0xFF242B36).withValues(alpha: 0.55)
       ..strokeWidth = 0.5;
+    final rect = geo.priceRect;
 
-    final step = _niceStep((maxP - minP) / 6);
-    final decimals = _decimalsFor(step);
-    var price = (minP / step).floorToDouble() * step;
-    while (price <= maxP) {
-      final y = yFor(price);
-      canvas.drawLine(Offset(0, y), Offset(priceRect.width, y), grid);
-      final label = price.toStringAsFixed(decimals);
-      _drawText(canvas, label, Offset(priceRect.width + 6, y - 6),
+    final step = geo.niceStep((geo.maxPrice - geo.minPrice) / 6);
+    final decimals = geo.decimalsFor(step);
+    var price = (geo.minPrice / step).floorToDouble() * step;
+    while (price <= geo.maxPrice) {
+      final y = geo.yForPrice(price);
+      canvas.drawLine(Offset(0, y), Offset(rect.width, y), grid);
+      _drawText(canvas, price.toStringAsFixed(decimals), Offset(rect.width + 6, y - 6),
           const Color(0xFF8B95A5), fontSize: 9.5);
       price += step;
     }
 
-    final barStep = math.max(1, (visibleCount / 6).round());
+    final barStep = math.max(1, (geo.visibleCount / 6).round());
     for (var i = start; i < end; i += barStep) {
-      final x = _xForBar(priceRect, barWidth, i);
-      canvas.drawLine(Offset(x, 0), Offset(x, priceRect.height), grid);
-      final label = _formatTime(candles[i].ts);
-      _drawText(canvas, label, Offset(x - 14, priceRect.bottom + 4),
+      final x = geo.xForBar(i.toDouble());
+      canvas.drawLine(Offset(x, 0), Offset(x, rect.height), grid);
+      _drawText(canvas, _formatTime(candles[i].ts), Offset(x - 14, rect.bottom + 4),
           const Color(0xFF8B95A5), fontSize: 9.5);
     }
   }
 
   // --------------------------------------------------------------------- volume
 
-  void _drawVolume(Canvas canvas, Rect rect, double barWidth, double bodyWidth, double maxV) {
+  void _drawVolume(Canvas canvas, ChartGeometry geo, double maxV) {
+    final rect = Rect.fromLTRB(0, geo.volumeTop, geo.chartWidth, geo.chartHeight);
     final paint = Paint();
     for (var i = start; i < end; i++) {
       final candle = candles[i];
-      final x = _xForBar(rect, barWidth, i);
+      final x = geo.xForBar(i.toDouble());
       final height = maxV <= 0 ? 0.0 : (candle.v / maxV) * rect.height;
       paint.color = (candle.isBullish ? const Color(0xFF2ECC71) : const Color(0xFFE74C3C))
           .withValues(alpha: 0.55);
+      final bodyWidth = math.max(1.0, math.min(14.0, geo.barWidth * 0.72));
       canvas.drawRect(
         Rect.fromLTRB(x - bodyWidth / 2, rect.bottom - height, x + bodyWidth / 2, rect.bottom),
         paint,
@@ -179,23 +145,18 @@ class CandleChartPainter extends CustomPainter {
 
   // -------------------------------------------------------------------- candles
 
-  void _drawCandles(
-    Canvas canvas,
-    Rect rect,
-    double barWidth,
-    double bodyWidth,
-    double Function(double) yFor,
-  ) {
+  void _drawCandles(Canvas canvas, ChartGeometry geo) {
+    final bodyWidth = math.max(1.0, math.min(14.0, geo.barWidth * 0.72));
     final wick = Paint()..strokeWidth = 1;
     final body = Paint();
     for (var i = start; i < end; i++) {
       final candle = candles[i];
       final color = candle.isBullish ? const Color(0xFF2ECC71) : const Color(0xFFE74C3C);
-      final x = _xForBar(rect, barWidth, i);
+      final x = geo.xForBar(i.toDouble());
       wick.color = color;
-      canvas.drawLine(Offset(x, yFor(candle.h)), Offset(x, yFor(candle.low)), wick);
-      final top = yFor(math.max(candle.o, candle.c));
-      final bottom = yFor(math.min(candle.o, candle.c));
+      canvas.drawLine(Offset(x, geo.yForPrice(candle.h)), Offset(x, geo.yForPrice(candle.low)), wick);
+      final top = geo.yForPrice(math.max(candle.o, candle.c));
+      final bottom = geo.yForPrice(math.min(candle.o, candle.c));
       body.color = color;
       canvas.drawRect(
         Rect.fromLTRB(x - bodyWidth / 2, top, x + bodyWidth / 2, math.max(bottom, top + 1)),
@@ -206,7 +167,7 @@ class CandleChartPainter extends CustomPainter {
 
   // -------------------------------------------------------------------- overlays
 
-  void _drawBands(Canvas canvas, Rect rect, double barWidth, models.Bands bands, double Function(double) yFor) {
+  void _drawBands(Canvas canvas, ChartGeometry geo, models.Bands bands) {
     final fill = Paint()..color = _colorForOverlay(bands.label).withValues(alpha: 0.10);
     final path = Path();
     var started = false;
@@ -217,12 +178,12 @@ class CandleChartPainter extends CustomPainter {
         started = false;
         continue;
       }
-      final x = _xForBar(rect, barWidth, i);
+      final x = geo.xForBar(i.toDouble());
       if (!started) {
-        path.moveTo(x, yFor(u));
+        path.moveTo(x, geo.yForPrice(u));
         started = true;
       } else {
-        path.lineTo(x, yFor(u));
+        path.lineTo(x, geo.yForPrice(u));
       }
     }
     final reverse = <Offset>[];
@@ -230,8 +191,8 @@ class CandleChartPainter extends CustomPainter {
       final u = bands.upper[i];
       final l = bands.lower[i];
       if (u == null || l == null) continue;
-      final x = _xForBar(rect, barWidth, i);
-      reverse.add(Offset(x, yFor(l)));
+      final x = geo.xForBar(i.toDouble());
+      reverse.add(Offset(x, geo.yForPrice(l)));
     }
     if (started && reverse.isNotEmpty) {
       for (final o in reverse) {
@@ -240,19 +201,12 @@ class CandleChartPainter extends CustomPainter {
       path.close();
       canvas.drawPath(path, fill);
     }
-    _drawLine(canvas, rect, barWidth, bands.mid, _colorForOverlay(bands.label), yFor);
-    _drawLine(canvas, rect, barWidth, bands.upper, _colorForOverlay(bands.label).withValues(alpha: 0.6), yFor);
-    _drawLine(canvas, rect, barWidth, bands.lower, _colorForOverlay(bands.label).withValues(alpha: 0.6), yFor);
+    _drawLine(canvas, geo, bands.mid, _colorForOverlay(bands.label));
+    _drawLine(canvas, geo, bands.upper, _colorForOverlay(bands.label).withValues(alpha: 0.6));
+    _drawLine(canvas, geo, bands.lower, _colorForOverlay(bands.label).withValues(alpha: 0.6));
   }
 
-  void _drawLine(
-    Canvas canvas,
-    Rect rect,
-    double barWidth,
-    List<double?> series,
-    Color color,
-    double Function(double) yFor,
-  ) {
+  void _drawLine(Canvas canvas, ChartGeometry geo, List<double?> series, Color color) {
     final paint = Paint()
       ..color = color
       ..strokeWidth = 1.1
@@ -265,8 +219,8 @@ class CandleChartPainter extends CustomPainter {
         started = false;
         continue;
       }
-      final x = _xForBar(rect, barWidth, i);
-      final y = yFor(value);
+      final x = geo.xForBar(i.toDouble());
+      final y = geo.yForPrice(value);
       if (!started) {
         path.moveTo(x, y);
         started = true;
@@ -277,31 +231,92 @@ class CandleChartPainter extends CustomPainter {
     canvas.drawPath(path, paint);
   }
 
+  // ------------------------------------------------------------------- drawings
+
+  void _drawDrawing(Canvas canvas, ChartGeometry geo, models.ChartDrawing drawing,
+      {bool selected = false, bool draft = false}) {
+    final color = drawing.color.withValues(alpha: draft ? 0.55 : 1.0);
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = selected ? 1.6 : 1.1
+      ..style = PaintingStyle.stroke;
+    final decimals = geo.decimalsFor(geo.niceStep((geo.maxPrice - geo.minPrice) / 40));
+
+    switch (drawing) {
+      case models.TrendLineDrawing(:final p1, :final p2):
+        canvas.drawLine(
+            Offset(geo.xForBar(p1.bar), geo.yForPrice(p1.price)),
+            Offset(geo.xForBar(p2.bar), geo.yForPrice(p2.price)),
+            paint);
+        if (selected) _drawHandles(canvas, geo, [p1, p2]);
+      case models.RayDrawing(:final p1, :final p2):
+        final a = Offset(geo.xForBar(p1.bar), geo.yForPrice(p1.price));
+        final b = Offset(geo.xForBar(p2.bar), geo.yForPrice(p2.price));
+        // extend to the right edge of the chart
+        final direction = b - a;
+        final t = direction.dx != 0 ? (geo.chartWidth - a.dx) / direction.dx : 0.0;
+        final end = a + direction * math.max(t, 0);
+        canvas.drawLine(a, end, paint);
+        if (selected) _drawHandles(canvas, geo, [p1, p2]);
+      case models.HorizontalLineDrawing(:final price):
+        canvas.drawLine(
+            Offset(0, geo.yForPrice(price)), Offset(geo.chartWidth, geo.yForPrice(price)), paint);
+        _drawText(canvas, price.toStringAsFixed(decimals),
+            Offset(geo.chartWidth + 4, geo.yForPrice(price) - 6), color, fontSize: 9.5);
+      case models.VerticalLineDrawing(:final bar):
+        canvas.drawLine(
+            Offset(geo.xForBar(bar), 0), Offset(geo.xForBar(bar), geo.priceBottom), paint);
+      case models.RectangleDrawing(:final p1, :final p2):
+        final a = Offset(geo.xForBar(p1.bar), geo.yForPrice(p1.price));
+        final b = Offset(geo.xForBar(p2.bar), geo.yForPrice(p2.price));
+        canvas.drawRect(Rect.fromPoints(a, b), paint);
+        if (selected) _drawHandles(canvas, geo, [p1, p2]);
+      case models.FibRetracementDrawing(:final high, :final low):
+        final left = geo.xForBar(high.bar < low.bar ? high.bar : low.bar);
+        final right = geo.xForBar(high.bar < low.bar ? low.bar : high.bar);
+        for (final f in models.FibRetracementDrawing.levels) {
+          final price = high.price - (high.price - low.price) * f;
+          final y = geo.yForPrice(price);
+          canvas.drawLine(Offset(left, y), Offset(right, y), paint);
+          _drawText(
+              canvas,
+              '${(f * 100).round()}%  ${price.toStringAsFixed(decimals)}',
+              Offset(right + 4, y - 6),
+              color,
+              fontSize: 9.5);
+        }
+        if (selected) _drawHandles(canvas, geo, [high, low]);
+    }
+  }
+
+  void _drawHandles(Canvas canvas, ChartGeometry geo, List<models.ChartPoint> points) {
+    final paint = Paint()..color = const Color(0xFFFFFFFF);
+    final stroke = Paint()
+      ..color = const Color(0xFF3B9EFF)
+      ..strokeWidth = 1;
+    for (final p in points) {
+      final o = Offset(geo.xForBar(p.bar), geo.yForPrice(p.price));
+      final r = 3.0;
+      canvas.drawCircle(o, r + 1, stroke);
+      canvas.drawCircle(o, r, paint);
+    }
+  }
+
   // ------------------------------------------------------------------- crosshair
 
-  void _drawCrosshair(
-    Canvas canvas,
-    Rect rect,
-    double barWidth,
-    int index,
-    double? price,
-    double Function(double) yFor,
-    double minP,
-    double maxP,
-  ) {
-    final x = _xForBar(rect, barWidth, index);
+  void _drawCrosshair(Canvas canvas, ChartGeometry geo, int index, double? price) {
+    final x = geo.xForBar(index.toDouble());
     final line = Paint()
       ..color = const Color(0xFF8B95A5).withValues(alpha: 0.9)
       ..strokeWidth = 0.8;
-    canvas.drawLine(Offset(x, 0), Offset(x, rect.height), line);
+    canvas.drawLine(Offset(x, 0), Offset(x, geo.priceBottom), line);
 
     final p = price ?? candles[index].c;
-    final y = yFor(p);
-    canvas.drawLine(Offset(0, y), Offset(rect.width, y), line);
+    final y = geo.yForPrice(p);
+    canvas.drawLine(Offset(0, y), Offset(geo.chartWidth, y), line);
 
-    // price tag on the right scale
     final tag = Paint()..color = const Color(0xFF3B9EFF);
-    final label = p.toStringAsFixed(_decimalsFor((maxP - minP) / 40));
+    final label = p.toStringAsFixed(geo.decimalsFor((geo.maxPrice - geo.minPrice) / 40));
     final tp = TextPainter(
       text: TextSpan(
         text: label,
@@ -309,13 +324,13 @@ class CandleChartPainter extends CustomPainter {
       ),
       textDirection: TextDirection.ltr,
     )..layout();
-    final tagRect = Rect.fromLTWH(rect.width + 1, y - 7, 34, 14);
+    final tagRect = Rect.fromLTWH(geo.chartWidth + 1, y - 7, 34, 14);
     canvas.drawRect(tagRect, tag);
-    tp.paint(canvas, Offset(rect.width + 6, y - 5.5));
+    tp.paint(canvas, Offset(geo.chartWidth + 6, y - 5.5));
   }
 
-  void _drawLastPriceTag(Canvas canvas, Rect rect, double price, double y) {
-    final decimals = _decimalsFor(_niceStep((rect.height) / 60));
+  void _drawLastPriceTag(Canvas canvas, ChartGeometry geo, double price) {
+    final decimals = geo.decimalsFor(geo.niceStep((geo.priceBottom) / 60));
     final label = price.toStringAsFixed(decimals);
     final tp = TextPainter(
       text: TextSpan(text: label, style: const TextStyle(color: Color(0xFFFFFFFF), fontSize: 9.5)),
@@ -323,13 +338,13 @@ class CandleChartPainter extends CustomPainter {
     )..layout();
     final w = tp.width + 12;
     final paint = Paint()..color = const Color(0xFF3B9EFF);
-    canvas.drawRect(Rect.fromLTWH(rect.width + 1, y - 7, w, 14), paint);
-    tp.paint(canvas, Offset(rect.width + 7, y - 5.5));
+    canvas.drawRect(Rect.fromLTWH(geo.chartWidth + 1, geo.yForPrice(price) - 7, w, 14), paint);
+    tp.paint(canvas, Offset(geo.chartWidth + 7, geo.yForPrice(price) - 5.5));
   }
 
   // --------------------------------------------------------------------- OHLC
 
-  void _drawOhlc(Canvas canvas, int index) {
+  void _drawOhlc(Canvas canvas, ChartGeometry geo, int index) {
     if (index < 0 || index >= candles.length) return;
     final c = candles[index];
     final color = c.isBullish ? const Color(0xFF2ECC71) : const Color(0xFFE74C3C);
@@ -356,25 +371,6 @@ class CandleChartPainter extends CustomPainter {
 
   // -------------------------------------------------------------------- helpers
 
-  double _xForBar(Rect rect, double barWidth, int index) =>
-      rect.left + (index - start) * barWidth + barWidth / 2;
-
-  void _extendRange(
-    List<double?> series,
-    int start,
-    int end,
-    void Function(double) takeMin,
-    void Function(double) takeMax,
-  ) {
-    for (var i = start; i < end && i < series.length; i++) {
-      final v = series[i];
-      if (v != null) {
-        takeMin(v);
-        takeMax(v);
-      }
-    }
-  }
-
   String _formatTime(DateTime ts) {
     if (timeframe.isIntraday) {
       return '${_two(ts.hour)}:${_two(ts.minute)}';
@@ -385,34 +381,6 @@ class CandleChartPainter extends CustomPainter {
   String _two(int v) => v.toString().padLeft(2, '0');
 
   Color _colorForOverlay(String label) => models.overlayColors[label] ?? const Color(0xFF3B9EFF);
-
-  double _niceStep(double rough) {
-    if (rough <= 0) return 1;
-    final mag = math.pow(10.0, (math.log(rough) / math.ln10).floor()).toDouble();
-    final norm = rough / mag;
-    double nice;
-    if (norm < 1.5) {
-      nice = 1;
-    } else if (norm < 3.5) {
-      nice = 2;
-    } else if (norm < 7.5) {
-      nice = 5;
-    } else {
-      nice = 10;
-    }
-    return nice * mag;
-  }
-
-  int _decimalsFor(double step) {
-    if (step >= 1) return 0;
-    var s = step;
-    var d = 0;
-    while (s < 1) {
-      s *= 10;
-      d++;
-    }
-    return d;
-  }
 
   void _drawText(
     Canvas canvas,
