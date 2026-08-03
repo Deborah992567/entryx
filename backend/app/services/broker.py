@@ -323,8 +323,9 @@ class PaperBroker(BrokerAdapter):
             )
         notional = price * info.contract_size * volume
         commission = round(notional * COMMISSION_RATE, 2)
+        shared = uuid.uuid4().hex[:12]
         order = BrokerOrder(
-            id=_new_id("o"),
+            id=f"o-{shared}",
             symbol=symbol,
             side=request.side,
             type=request.type,
@@ -340,7 +341,7 @@ class PaperBroker(BrokerAdapter):
         )
         self._orders[order.id] = order
         position = BrokerPosition(
-            id=_new_id("p"),
+            id=f"p-{shared}",
             symbol=symbol,
             side=request.side,
             volume=volume,
