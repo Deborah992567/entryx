@@ -1,8 +1,8 @@
 /// Chart panel — real canvas engine surface.
 ///
-/// Toolbar (symbol, timeframe, indicators, follow/reset), the CustomPainter
-/// chart with pan/zoom/crosshair gestures, and a legend bar with the active
-/// bar's OHLC plus overlay chips.
+/// Toolbar (symbol, timeframe, indicators, drawing tools), the CustomPainter
+/// chart with pan/zoom/crosshair gestures plus drag-to-draw and move/select
+/// drawing interactions, and a legend bar with OHLC + overlay chips.
 library;
 
 import 'package:flutter/gestures.dart';
@@ -11,12 +11,22 @@ import 'package:provider/provider.dart';
 
 import '../../app/theme.dart';
 import '../chart/candle_painter.dart';
+import '../chart/chart_geometry.dart';
 import '../chart/chart_models.dart';
 import '../chart/chart_store.dart';
 import '../market/market_watch_store.dart';
 
-class ChartPanel extends StatelessWidget {
+class ChartPanel extends StatefulWidget {
   const ChartPanel({super.key});
+
+  @override
+  State<ChartPanel> createState() => _ChartPanelState();
+}
+
+class _ChartPanelState extends State<ChartPanel> {
+  ChartPoint? _pendingStart;
+  ChartDrawing? _draft;
+  ({ChartDrawing drawing, double bar, double price})? _moveState;
 
   @override
   Widget build(BuildContext context) {
@@ -32,12 +42,20 @@ class ChartPanel extends StatelessWidget {
       children: [
         _Toolbar(store: store, watch: watch),
         const Divider(height: 1),
+        _DrawingToolbar(store: store),
+        const Divider(height: 1),
         Expanded(
           child: LayoutBuilder(
             builder: (context, constraints) {
-              final chartWidth = constraints.maxWidth - CandleChartPainter.priceWidth;
-              final visibleCount = store.visibleEnd - store.visibleStart;
-              final barWidth = visibleCount > 0 && chartWidth > 0 ? chartWidth / visibleCount : 1.0;
+              final geo = ChartGeometry(
+                size: Size(constraints.maxWidth, constraints.maxHeight),
+                candles: store.candles,
+                start: store.visibleStart,
+                end: store.visibleEnd,
+                overlays: pack.overlays,
+                bands: pack.bands,
+              );
+              final barWidth = geo.barWidth;
 
               return Listener(
                 onPointerSignal: (event) {
@@ -52,21 +70,20 @@ class ChartPanel extends StatelessWidget {
                 child: MouseRegion(
                   onExit: (_) => store.setCrosshair(null, null),
                   onHover: (details) {
-                    if (visibleCount <= 0) return;
+                    if (!geo.hasData) return;
                     final index = store.visibleStart +
                         (details.localPosition.dx / barWidth)
                             .floor()
-                            .clamp(0, visibleCount - 1)
+                            .clamp(0, geo.visibleCount - 1)
                             .toInt();
-                    final midY = details.localPosition.dy;
-                    final price = _priceAtY(store, midY, constraints.maxHeight);
-                    store.setCrosshair(index, price);
+                    store.setCrosshair(index, geo.priceAtY(details.localPosition.dy));
                   },
                   child: GestureDetector(
                     behavior: HitTestBehavior.opaque,
-                    onHorizontalDragUpdate: (details) {
-                      store.panBy((details.delta.dx / barWidth).round());
-                    },
+                    onPanStart: (details) => _onPanStart(store, geo, details.localPosition),
+                    onPanUpdate: (details) => _onPanUpdate(store, geo, details),
+                    onPanEnd: (details) => _onPanEnd(store, geo),
+                    onTapUp: (details) => _onTapUp(store, geo, details.localPosition),
                     onDoubleTapDown: (details) => store.resetView(),
                     child: CustomPaint(
                       painter: CandleChartPainter(
@@ -79,7 +96,9 @@ class ChartPanel extends StatelessWidget {
                         crosshairPrice: store.crosshairPrice,
                         overlays: pack.overlays,
                         bands: pack.bands,
-                        connected: true,
+                        drawings: store.drawings,
+                        selectedDrawingId: store.selectedDrawingId,
+                        draft: _draft,
                       ),
                       size: Size(constraints.maxWidth, constraints.maxHeight),
                     ),
@@ -95,26 +114,130 @@ class ChartPanel extends StatelessWidget {
     );
   }
 
-  /// Maps a canvas y position back to a price using the same geometry as the painter.
-  double _priceAtY(ChartStore store, double y, double height) {
-    final candles = store.candles;
-    if (candles.isEmpty) return 0;
-    var minP = double.infinity;
-    var maxP = double.negativeInfinity;
-    for (var i = store.visibleStart; i < store.visibleEnd && i < candles.length; i++) {
-      final c = candles[i];
-      if (c.low < minP) minP = c.low;
-      if (c.h > maxP) maxP = c.h;
+  void _onPanStart(ChartStore store, ChartGeometry geo, Offset pos) {
+    if (!geo.hasData) return;
+    final bar = geo.barAtX(pos.dx);
+    final price = geo.priceAtY(pos.dy);
+
+    if (store.tool == DrawingTool.select) {
+      final hit = _hitTestDrawing(store, pos, geo);
+      if (hit != null) {
+        store.selectDrawing(hit.id);
+        _moveState = (drawing: hit, bar: bar, price: price);
+      } else {
+        store.selectDrawing(null);
+      }
+      return;
     }
-    if (!minP.isFinite) return 0;
-    final pad = (maxP - minP) * 0.06;
-    minP -= pad;
-    maxP += pad;
-    if (maxP <= minP) maxP = minP + 1;
-    final chartBottom = height - CandleChartPainter.timeHeight;
-    final volume = chartBottom * 0.22;
-    final priceBottom = chartBottom - volume;
-    return maxP - (y - 0) / (priceBottom - 0) * (maxP - minP);
+
+    final point = ChartPoint(bar, price);
+    _pendingStart = point;
+    _draft = _makeDraft(store.tool, -1, point);
+    setState(() {});
+  }
+
+  void _onPanUpdate(ChartStore store, ChartGeometry geo, DragUpdateDetails details) {
+    if (!geo.hasData) return;
+    final move = _moveState;
+    if (move != null) {
+      final dBar = geo.barAtX(details.localPosition.dx) - move.bar;
+      final dPrice = geo.priceAtY(details.localPosition.dy) - move.price;
+      store.updateDrawing(move.drawing.translate(dBar, dPrice));
+      return;
+    }
+    if (_draft != null) {
+      final end = ChartPoint(geo.barAtX(details.localPosition.dx), geo.priceAtY(details.localPosition.dy));
+      _draft = _makeDraft(store.tool, -1, _pendingStart ?? end, end);
+      setState(() {});
+      return;
+    }
+    if (store.tool == DrawingTool.select) {
+      store.panBy((details.delta.dx / geo.barWidth).round());
+    }
+  }
+
+  void _onPanEnd(ChartStore store, ChartGeometry geo) {
+    final move = _moveState;
+    if (move != null) {
+      _moveState = null;
+      return;
+    }
+    final draft = _draft;
+    _draft = null;
+    final start = _pendingStart;
+    _pendingStart = null;
+    if (draft == null) return;
+    setState(() {});
+
+    switch (draft) {
+      case HorizontalLineDrawing():
+        store.addDrawing(HorizontalLineDrawing(
+            id: store.nextDrawingId, price: draft.price, color: draft.color));
+      case VerticalLineDrawing():
+        store.addDrawing(VerticalLineDrawing(
+            id: store.nextDrawingId, bar: draft.bar, color: draft.color));
+      case TrendLineDrawing():
+        if (_dragDistance(geo, start!, draft.p2) >= 4) {
+          store.addDrawing(TrendLineDrawing(
+              id: store.nextDrawingId, p1: start, p2: draft.p2, color: draft.color));
+        }
+      case RayDrawing():
+        if (_dragDistance(geo, start!, draft.p2) >= 4) {
+          store.addDrawing(RayDrawing(
+              id: store.nextDrawingId, p1: start, p2: draft.p2, color: draft.color));
+        }
+      case RectangleDrawing():
+        if (_dragDistance(geo, start!, draft.p2) >= 4) {
+          store.addDrawing(RectangleDrawing(
+              id: store.nextDrawingId, p1: start, p2: draft.p2, color: draft.color));
+        }
+      case FibRetracementDrawing():
+        if (_dragDistance(geo, start!, draft.p2) >= 4) {
+          store.addDrawing(FibRetracementDrawing(
+              id: store.nextDrawingId, p1: start, p2: draft.p2, color: draft.color));
+        }
+    }
+  }
+
+  void _onTapUp(ChartStore store, ChartGeometry geo, Offset pos) {
+    if (store.tool != DrawingTool.select) return;
+    final hit = _hitTestDrawing(store, pos, geo);
+    store.selectDrawing(hit?.id);
+  }
+
+  double _dragDistance(ChartGeometry geo, ChartPoint a, ChartPoint b) {
+    final p = Offset(geo.xForBar(a.bar), geo.yForPrice(a.price));
+    final q = Offset(geo.xForBar(b.bar), geo.yForPrice(b.price));
+    return (p - q).distance;
+  }
+
+  ChartDrawing _makeDraft(DrawingTool tool, int id, ChartPoint a, [ChartPoint? b]) {
+    final p2 = b ?? a;
+    switch (tool) {
+      case DrawingTool.trendLine:
+        return TrendLineDrawing(id: id, p1: a, p2: p2);
+      case DrawingTool.ray:
+        return RayDrawing(id: id, p1: a, p2: p2);
+      case DrawingTool.horizontal:
+        return HorizontalLineDrawing(id: id, price: a.price);
+      case DrawingTool.vertical:
+        return VerticalLineDrawing(id: id, bar: a.bar);
+      case DrawingTool.rectangle:
+        return RectangleDrawing(id: id, p1: a, p2: p2);
+      case DrawingTool.fibonacci:
+        return FibRetracementDrawing(id: id, p1: a, p2: p2);
+      case DrawingTool.select:
+        throw StateError('select tool has no draft');
+    }
+  }
+
+  ChartDrawing? _hitTestDrawing(ChartStore store, Offset pos, ChartGeometry geo) {
+    final selected = store.selectedDrawing;
+    if (selected != null && selected.hitTest(pos, geo)) return selected;
+    for (final d in store.drawings.reversed) {
+      if (d.hitTest(pos, geo)) return d;
+    }
+    return null;
   }
 }
 
@@ -173,6 +296,85 @@ class _Toolbar extends StatelessWidget {
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(minWidth: 26, minHeight: 26),
           ),
+          const SizedBox(width: 8),
+        ],
+      ),
+    );
+  }
+}
+
+class _DrawingToolbar extends StatelessWidget {
+  const _DrawingToolbar({required this.store});
+
+  final ChartStore store;
+
+  static const Map<DrawingTool, IconData> icons = {
+    DrawingTool.select: Icons.ads_click,
+    DrawingTool.trendLine: Icons.timeline,
+    DrawingTool.ray: Icons.north_east,
+    DrawingTool.horizontal: Icons.remove,
+    DrawingTool.vertical: Icons.line_weight,
+    DrawingTool.rectangle: Icons.crop_square,
+    DrawingTool.fibonacci: Icons.show_chart,
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 30,
+      child: Row(
+        children: [
+          const SizedBox(width: 8),
+          for (final tool in DrawingTool.values) ...[
+            InkWell(
+              onTap: () => store.setTool(tool),
+              child: Container(
+                width: 26,
+                height: 22,
+                decoration: BoxDecoration(
+                  color: store.tool == tool ? EntryXColors.accentBright.withValues(alpha: 0.25) : null,
+                  borderRadius: BorderRadius.circular(3),
+                ),
+                child: Tooltip(
+                  message: tool.label,
+                  child: Icon(
+                    icons[tool],
+                    size: 13,
+                    color: store.tool == tool ? EntryXColors.accentBright : EntryXColors.textDim,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 2),
+          ],
+          const SizedBox(width: 8),
+          IconButton(
+            onPressed: store.selectedDrawingId != null ? store.removeSelectedDrawing : null,
+            icon: const Icon(Icons.delete_outline, size: 14, color: EntryXColors.textDim),
+            tooltip: 'Delete selected drawing',
+            visualDensity: VisualDensity.compact,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+          ),
+          IconButton(
+            onPressed: store.drawings.isEmpty ? null : store.clearDrawings,
+            icon: const Icon(Icons.delete_sweep_outlined, size: 14, color: EntryXColors.textDim),
+            tooltip: 'Clear all drawings',
+            visualDensity: VisualDensity.compact,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+          ),
+          const Spacer(),
+          if (store.tool != DrawingTool.select)
+            Text(
+              '${store.tool.label} — drag on the chart',
+              style: const TextStyle(fontSize: 10, color: EntryXColors.textDim),
+            )
+          else if (store.selectedDrawing != null)
+            Text(
+              'drawing selected — drag to move, Delete to remove',
+              style: const TextStyle(fontSize: 10, color: EntryXColors.warn),
+            ),
           const SizedBox(width: 8),
         ],
       ),
