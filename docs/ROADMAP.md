@@ -29,10 +29,10 @@ Legend: `[x]` done · `[~]` in progress · `[ ]` planned
 
 ## PHASE 3 — Chart engine + indicators + drawings
 
-- [~] Canvas chart engine: candlesticks, volume, timeframes (M1…MN1), zoom/pan/crosshair
-- [~] Indicator engine (common interface): SMA, EMA, WMA, VWAP, RSI, MACD, Stochastic,
+- [x] Canvas chart engine: candlesticks, volume, timeframes (M1…MN1), zoom/pan/crosshair
+- [x] Indicator engine (common interface): SMA, EMA, WMA, VWAP, RSI, MACD, Stochastic,
   ATR, ADX, CCI, ROC, Momentum, Bollinger, Ichimoku, PSAR, OBV, volume
-- [ ] Price scale, time scale, auto-scroll, multiple charts, split views, synced charts
+- [~] Price scale, time scale, auto-scroll, multiple charts, split views, synced charts
 - [ ] Drawing tools: trendline, h/v lines, ray, channel, rectangle, ellipse, arrow, text,
   Fibonacci retrace/extension/fan, pitchfork, S/R — movable/editable/persistent
 - [ ] Chart templates, themes, layout persistence integration
