@@ -49,6 +49,7 @@ class ChartStore extends ChangeNotifier {
   List<ChartDrawing> _drawings = [];
   int? _selectedDrawingId;
   int _nextDrawingId = 1;
+  DrawingTool _tool = DrawingTool.select;
 
   static const List<String> _indicatorOrder = ['sma20', 'sma50', 'ema20', 'vwap', 'bollinger'];
   final Map<String, bool> _indicatorEnabled = {
@@ -75,6 +76,8 @@ class ChartStore extends ChangeNotifier {
 
   List<ChartDrawing> get drawings => List.unmodifiable(_drawings);
   int? get selectedDrawingId => _selectedDrawingId;
+  int get nextDrawingId => _nextDrawingId;
+  DrawingTool get tool => _tool;
   ChartDrawing? get selectedDrawing {
     if (_selectedDrawingId == null) return null;
     for (final d in _drawings) {
@@ -208,6 +211,15 @@ class ChartStore extends ChangeNotifier {
   void selectDrawing(int? id) {
     if (_selectedDrawingId == id) return;
     _selectedDrawingId = id;
+    notifyListeners();
+  }
+
+  void setTool(DrawingTool tool) {
+    if (_tool == tool) return;
+    _tool = tool;
+    if (tool != DrawingTool.select) {
+      _selectedDrawingId = null;
+    }
     notifyListeners();
   }
 
