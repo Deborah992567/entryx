@@ -7,6 +7,7 @@ via TestClient's websocket support.
 
 from __future__ import annotations
 
+import app.services.trading_service as trading_service
 import pytest
 from app.db import models as _models  # noqa: F401  (register models on Base.metadata)
 from app.db.base import Base
@@ -35,6 +36,7 @@ def _reset_state():
     ws_manager.manager._connections.clear()
     ws_manager.manager._channels.clear()
     ws_manager.manager._seq.clear()
+    trading_service.reset_brokers()
     yield
 
 
