@@ -23,7 +23,7 @@ Legend: `[x]` done · `[~]` in progress · `[ ]` planned
 
 - [x] `MarketDataProvider` interface + simulated deterministic provider
 - [x] `BrokerAdapter` interface + `PaperBroker` (virtual accounts, deposits, fills)
-- [~] Market Watch panel: symbols, bid/ask/spread/change/volume, search/favorites/categories
+- [x] Market Watch panel: symbols, bid/ask/spread/change/volume, search/favorites/categories
 - [x] WebSockets: tick/candle broadcasting to panels; account/P&L events
 - [x] Order/position REST + WS lifecycle on the paper broker
 
@@ -100,7 +100,8 @@ Legend: `[x]` done · `[~]` in progress · `[ ]` planned
 | Phase | Title | Status |
 |---|---|---|
 | 1 | Foundation | done |
-| 2 | Market data + paper broker + real-time | in progress |
+| 2 | Market data + paper broker + real-time | done |
+| 3 | Chart engine + indicators + drawings | planned |
 | 3 | Chart engine + indicators + drawings | planned |
 | 4 | Trading engine + risk | planned |
 | 5 | Strategy + backtesting + optimization | planned |
