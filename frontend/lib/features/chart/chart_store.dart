@@ -46,6 +46,10 @@ class ChartStore extends ChangeNotifier {
   int? _crosshairIndex;
   double? _crosshairPrice;
 
+  List<ChartDrawing> _drawings = [];
+  int? _selectedDrawingId;
+  int _nextDrawingId = 1;
+
   static const List<String> _indicatorOrder = ['sma20', 'sma50', 'ema20', 'vwap', 'bollinger'];
   final Map<String, bool> _indicatorEnabled = {
     'sma20': true,
@@ -68,6 +72,16 @@ class ChartStore extends ChangeNotifier {
 
   List<String> get indicatorKeys => List.unmodifiable(_indicatorOrder);
   bool indicatorEnabled(String key) => _indicatorEnabled[key] ?? false;
+
+  List<ChartDrawing> get drawings => List.unmodifiable(_drawings);
+  int? get selectedDrawingId => _selectedDrawingId;
+  ChartDrawing? get selectedDrawing {
+    if (_selectedDrawingId == null) return null;
+    for (final d in _drawings) {
+      if (d.id == _selectedDrawingId) return d;
+    }
+    return null;
+  }
 
   int get _viewEnd => _right == -1 ? _candles.length : _right + 1;
 
@@ -153,6 +167,47 @@ class ChartStore extends ChangeNotifier {
     if (_crosshairIndex == index && _crosshairPrice == price) return;
     _crosshairIndex = index;
     _crosshairPrice = price;
+    notifyListeners();
+  }
+
+  /// Allocates an id and appends a finished drawing.
+  void addDrawing(ChartDrawing drawing) {
+    _drawings = [..._drawings, drawing];
+    if (drawing.id >= _nextDrawingId) {
+      _nextDrawingId = drawing.id + 1;
+    }
+    notifyListeners();
+  }
+
+  void updateDrawing(ChartDrawing drawing) {
+    _drawings = [
+      for (final d in _drawings) d.id == drawing.id ? drawing : d,
+    ];
+    notifyListeners();
+  }
+
+  void removeDrawing(int id) {
+    _drawings = [for (final d in _drawings) if (d.id != id) d];
+    if (_selectedDrawingId == id) {
+      _selectedDrawingId = null;
+    }
+    notifyListeners();
+  }
+
+  void removeSelectedDrawing() {
+    final id = _selectedDrawingId;
+    if (id != null) removeDrawing(id);
+  }
+
+  void clearDrawings() {
+    _drawings = [];
+    _selectedDrawingId = null;
+    notifyListeners();
+  }
+
+  void selectDrawing(int? id) {
+    if (_selectedDrawingId == id) return;
+    _selectedDrawingId = id;
     notifyListeners();
   }
 
