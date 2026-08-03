@@ -7,9 +7,12 @@ def test_health_public(client):
     resp = client.get("/api/v1/health")
     assert resp.status_code == 200
     body = resp.json()
-    assert body["status"] == "degraded"
+    assert body["status"] == "degraded"  # AI still pending (Phase 7)
     assert body["app"] == "EntryX"
     assert "database" in body["components"]
+    assert body["components"]["market_data"]["status"] == "ok"
+    assert body["components"]["broker"]["status"] == "ok"
+    assert body["components"]["ai"]["status"] == "degraded"
 
 
 def test_system_status_requires_auth(client):
