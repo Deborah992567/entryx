@@ -67,6 +67,10 @@ class ConnectionManager:
     def channel_subscribers(self, channel: str) -> list[WebSocket]:
         return [self._connections[cid] for cid in self._channels.get(channel, set()) if cid in self._connections]
 
+    def active_channels(self) -> list[str]:
+        """Channels that currently have at least one subscriber."""
+        return [channel for channel, subs in self._channels.items() if subs]
+
     # -- messaging -----------------------------------------------------------
 
     async def send(self, connection_id: str, message: dict[str, Any]) -> None:

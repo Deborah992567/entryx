@@ -12,6 +12,7 @@ from app.api.v1.router import api_router
 from app.core.config import get_settings
 from app.core.exceptions import register_exception_handlers
 from app.core.logging import setup_logging
+from app.services import broadcaster
 from app.ws import endpoint
 from app.ws.manager import manager
 
@@ -22,7 +23,9 @@ def create_app() -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(_: FastAPI):
+        broadcast_task = broadcaster.start_broadcasters()
         yield
+        broadcast_task.cancel()
         await manager.close_all()
 
     app = FastAPI(
