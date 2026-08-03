@@ -32,6 +32,11 @@ def get_broker(user_id: int) -> PaperBroker:
         return broker
 
 
+def active_brokers() -> list[PaperBroker]:
+    with _lock:
+        return list(_brokers.values())
+
+
 def reset_brokers() -> None:
     """Drop all in-memory accounts (used by tests)."""
     with _lock:

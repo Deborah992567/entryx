@@ -10,10 +10,19 @@ from app.api.deps import get_current_user
 from app.db.models.user import User
 from app.db.session import engine, get_db
 from app.schemas.health import ComponentStatus, HealthOut
+from app.services.broker import BrokerAccount
+from app.services.market_data import market_data
+from app.ws.manager import manager
 
 router = APIRouter(tags=["system"])
 
 APP_VERSION = "0.1.0"
+
+
+def active_brokers() -> list[BrokerAccount]:
+    from app.services import trading_service
+
+    return [b.account() for b in trading_service.active_brokers()]
 
 
 def _db_status() -> ComponentStatus:
@@ -30,8 +39,11 @@ def health() -> HealthOut:
     db = _db_status()
     components = {
         "database": db,
-        "market_data": ComponentStatus(status="degraded", detail="provider not started (Phase 2)"),
-        "broker": ComponentStatus(status="degraded", detail="paper broker not started (Phase 2)"),
+        "market_data": ComponentStatus(
+            status="ok",
+            detail={"provider": "simulated", "symbols": len(market_data.symbols())},
+        ),
+        "broker": ComponentStatus(status="ok", detail={"accounts": len(active_brokers())}),
         "ai": ComponentStatus(status="degraded", detail="AI provider not started (Phase 7)"),
     }
     overall = "ok" if all(c.status == "ok" for c in components.values()) else "degraded"
@@ -51,11 +63,11 @@ def system_status(
         "app": APP_VERSION,
         "components": {
             "database": _db_status().status,
-            "market_data": "not_started",
-            "broker": "not_started",
+            "market_data": "ok",
+            "broker": "ok",
             "ai": "not_started",
         },
-        "ws": {"connections": 0, "channels": 0},
+        "ws": manager.stats(),
     }
 
 
