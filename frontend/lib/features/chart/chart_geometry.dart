@@ -153,3 +153,11 @@ double distanceToRay(Offset p, Offset a, Offset b) {
   if (t < 0) return (p - a).distance;
   return (p - (a + ab * t)).distance;
 }
+
+/// Shortest distance from [p] to the infinite line through [a] along [v].
+double distanceToLine(Offset p, Offset a, Offset v) {
+  final len2 = v.dx * v.dx + v.dy * v.dy;
+  if (len2 == 0) return (p - a).distance;
+  final t = ((p - a).dx * v.dx + (p - a).dy * v.dy) / len2;
+  return (p - (a + v * t)).distance;
+}

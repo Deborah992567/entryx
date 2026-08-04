@@ -27,6 +27,7 @@ class _ChartPanelState extends State<ChartPanel> {
   ChartPoint? _pendingStart;
   ChartDrawing? _draft;
   ({ChartDrawing drawing, double bar, double price})? _moveState;
+  ({ChartPoint p1, ChartPoint p2})? _channelBase;
 
   @override
   Widget build(BuildContext context) {
@@ -42,7 +43,11 @@ class _ChartPanelState extends State<ChartPanel> {
       children: [
         _Toolbar(store: store, watch: watch),
         const Divider(height: 1),
-        _DrawingToolbar(store: store),
+        _DrawingToolbar(
+          store: store,
+          onToolSelected: (tool) => _onToolSelected(store, tool),
+          channelBasePending: _channelBase != null,
+        ),
         const Divider(height: 1),
         Expanded(
           child: LayoutBuilder(
@@ -132,7 +137,17 @@ class _ChartPanelState extends State<ChartPanel> {
 
     final point = ChartPoint(bar, price);
     _pendingStart = point;
-    _draft = _makeDraft(store.tool, -1, point);
+    if (store.tool == DrawingTool.channel) {
+      final base = _channelBase;
+      _draft = ChannelDrawing(
+        id: -1,
+        p1: base?.p1 ?? point,
+        p2: base?.p2 ?? point,
+        p3: point,
+      );
+    } else {
+      _draft = _makeDraft(store.tool, -1, point);
+    }
     setState(() {});
   }
 
@@ -145,9 +160,20 @@ class _ChartPanelState extends State<ChartPanel> {
       store.updateDrawing(move.drawing.translate(dBar, dPrice));
       return;
     }
-    if (_draft != null) {
+    final draft = _draft;
+    if (draft != null) {
       final end = ChartPoint(geo.barAtX(details.localPosition.dx), geo.priceAtY(details.localPosition.dy));
-      _draft = _makeDraft(store.tool, -1, _pendingStart ?? end, end);
+      if (draft is ChannelDrawing) {
+        final base = _channelBase;
+        _draft = ChannelDrawing(
+          id: -1,
+          p1: draft.p1,
+          p2: base?.p2 ?? end,
+          p3: end,
+        );
+      } else {
+        _draft = _makeDraft(store.tool, -1, _pendingStart ?? end, end);
+      }
       setState(() {});
       return;
     }
@@ -168,6 +194,11 @@ class _ChartPanelState extends State<ChartPanel> {
     _pendingStart = null;
     if (draft == null) return;
     setState(() {});
+
+    if (draft is ChannelDrawing) {
+      _finishChannelDrag(store, geo, draft);
+      return;
+    }
 
     switch (draft) {
       case HorizontalLineDrawing():
@@ -196,13 +227,71 @@ class _ChartPanelState extends State<ChartPanel> {
           store.addDrawing(FibRetracementDrawing(
               id: store.nextDrawingId, p1: start, p2: draft.p2, color: draft.color));
         }
+      case ArrowDrawing():
+        if (_dragDistance(geo, start!, draft.p2) >= 4) {
+          store.addDrawing(ArrowDrawing(
+              id: store.nextDrawingId, p1: start, p2: draft.p2, color: draft.color));
+        }
+      case ChannelDrawing():
+        break; // handled in _finishChannelDrag
+      case EllipseDrawing():
+        if (_dragDistance(geo, start!, draft.p2) >= 4) {
+          store.addDrawing(EllipseDrawing(
+              id: store.nextDrawingId, p1: start, p2: draft.p2, color: draft.color));
+        }
+      case TextDrawing():
+        break; // text labels are placed via tap dialog, never drafted
     }
   }
 
   void _onTapUp(ChartStore store, ChartGeometry geo, Offset pos) {
+    if (store.tool == DrawingTool.text) {
+      _placeText(store, geo, pos);
+      return;
+    }
     if (store.tool != DrawingTool.select) return;
     final hit = _hitTestDrawing(store, pos, geo);
     store.selectDrawing(hit?.id);
+  }
+
+  void _onToolSelected(ChartStore store, DrawingTool tool) {
+    _channelBase = null;
+    _moveState = null;
+    _draft = null;
+    store.setTool(tool);
+  }
+
+  /// Channels are drawn in two drags: the first sets the guide line, the second
+  /// sets the perpendicular offset of the parallel edge.
+  void _finishChannelDrag(ChartStore store, ChartGeometry geo, ChannelDrawing draft) {
+    final base = _channelBase;
+    if (base == null) {
+      if (_dragDistance(geo, draft.p1, draft.p2) >= 4) {
+        _channelBase = (p1: draft.p1, p2: draft.p2);
+      }
+      return;
+    }
+    final a = Offset(geo.xForBar(draft.p1.bar), geo.yForPrice(draft.p1.price));
+    final b = Offset(geo.xForBar(draft.p2.bar), geo.yForPrice(draft.p2.price));
+    final c = Offset(geo.xForBar(draft.p3.bar), geo.yForPrice(draft.p3.price));
+    if (distanceToLine(c, a, b - a) < 4) return; // too thin to be useful
+    store.addDrawing(ChannelDrawing(
+        id: store.nextDrawingId, p1: draft.p1, p2: draft.p2, p3: draft.p3, color: draft.color));
+    _channelBase = null;
+  }
+
+  Future<void> _placeText(ChartStore store, ChartGeometry geo, Offset pos) async {
+    final text = await showDialog<String>(
+      context: context,
+      builder: (ctx) => const _TextInputDialog(),
+    );
+    final value = text?.trim();
+    if (value == null || value.isEmpty || !mounted) return;
+    store.addDrawing(TextDrawing(
+      id: store.nextDrawingId,
+      p1: ChartPoint(geo.barAtX(pos.dx), geo.priceAtY(pos.dy)),
+      text: value,
+    ));
   }
 
   double _dragDistance(ChartGeometry geo, ChartPoint a, ChartPoint b) {
@@ -226,6 +315,14 @@ class _ChartPanelState extends State<ChartPanel> {
         return RectangleDrawing(id: id, p1: a, p2: p2);
       case DrawingTool.fibonacci:
         return FibRetracementDrawing(id: id, p1: a, p2: p2);
+      case DrawingTool.arrow:
+        return ArrowDrawing(id: id, p1: a, p2: p2);
+      case DrawingTool.channel:
+        return ChannelDrawing(id: id, p1: a, p2: p2, p3: p2);
+      case DrawingTool.ellipse:
+        return EllipseDrawing(id: id, p1: a, p2: p2);
+      case DrawingTool.text:
+        throw StateError('text tool has no draft');
       case DrawingTool.select:
         throw StateError('select tool has no draft');
     }
@@ -304,9 +401,12 @@ class _Toolbar extends StatelessWidget {
 }
 
 class _DrawingToolbar extends StatelessWidget {
-  const _DrawingToolbar({required this.store});
+  const _DrawingToolbar(
+      {required this.store, required this.onToolSelected, this.channelBasePending = false});
 
   final ChartStore store;
+  final ValueChanged<DrawingTool> onToolSelected;
+  final bool channelBasePending;
 
   static const Map<DrawingTool, IconData> icons = {
     DrawingTool.select: Icons.ads_click,
@@ -316,6 +416,10 @@ class _DrawingToolbar extends StatelessWidget {
     DrawingTool.vertical: Icons.line_weight,
     DrawingTool.rectangle: Icons.crop_square,
     DrawingTool.fibonacci: Icons.show_chart,
+    DrawingTool.arrow: Icons.arrow_upward,
+    DrawingTool.channel: Icons.swap_calls,
+    DrawingTool.ellipse: Icons.circle_outlined,
+    DrawingTool.text: Icons.text_fields,
   };
 
   @override
@@ -327,7 +431,7 @@ class _DrawingToolbar extends StatelessWidget {
           const SizedBox(width: 8),
           for (final tool in DrawingTool.values) ...[
             InkWell(
-              onTap: () => store.setTool(tool),
+              onTap: () => onToolSelected(tool),
               child: Container(
                 width: 26,
                 height: 22,
@@ -365,7 +469,16 @@ class _DrawingToolbar extends StatelessWidget {
             constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
           ),
           const Spacer(),
-          if (store.tool != DrawingTool.select)
+          if (channelBasePending)
+            const Text('channel base set — drag to set width',
+                style: TextStyle(fontSize: 10, color: EntryXColors.warn))
+          else if (store.tool == DrawingTool.channel)
+            const Text('channel — drag a guide line, then set its width',
+                style: TextStyle(fontSize: 10, color: EntryXColors.textDim))
+          else if (store.tool == DrawingTool.text)
+            const Text('text — tap on the chart to add a label',
+                style: TextStyle(fontSize: 10, color: EntryXColors.textDim))
+          else if (store.tool != DrawingTool.select)
             Text(
               '${store.tool.label} — drag on the chart',
               style: const TextStyle(fontSize: 10, color: EntryXColors.textDim),
@@ -512,6 +625,51 @@ class _LegendBar extends StatelessWidget {
               ),
         ],
       ),
+    );
+  }
+}
+
+class _TextInputDialog extends StatefulWidget {
+  const _TextInputDialog();
+
+  @override
+  State<_TextInputDialog> createState() => _TextInputDialogState();
+}
+
+class _TextInputDialogState extends State<_TextInputDialog> {
+  final TextEditingController _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: EntryXColors.bgRaised,
+      title: const Text('Chart label', style: TextStyle(fontSize: 14)),
+      content: TextField(
+        controller: _controller,
+        autofocus: true,
+        style: const TextStyle(fontSize: 13),
+        decoration: const InputDecoration(
+          hintText: 'Enter text…',
+          hintStyle: TextStyle(color: EntryXColors.textDim),
+        ),
+        onSubmitted: (v) => Navigator.of(context).pop(v),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel', style: TextStyle(fontSize: 12)),
+        ),
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(_controller.text),
+          child: const Text('OK', style: TextStyle(fontSize: 12)),
+        ),
+      ],
     );
   }
 }

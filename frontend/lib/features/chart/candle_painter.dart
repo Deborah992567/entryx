@@ -271,6 +271,29 @@ class CandleChartPainter extends CustomPainter {
         final b = Offset(geo.xForBar(p2.bar), geo.yForPrice(p2.price));
         canvas.drawRect(Rect.fromPoints(a, b), paint);
         if (selected) _drawHandles(canvas, geo, [p1, p2]);
+      case models.ArrowDrawing(:final p1, :final p2):
+        final a = Offset(geo.xForBar(p1.bar), geo.yForPrice(p1.price));
+        final b = Offset(geo.xForBar(p2.bar), geo.yForPrice(p2.price));
+        canvas.drawLine(a, b, paint);
+        _drawArrowHead(canvas, a, b, color);
+        if (selected) _drawHandles(canvas, geo, [p1, p2]);
+      case models.ChannelDrawing(:final p1, :final p2, :final p3):
+        final a = Offset(geo.xForBar(p1.bar), geo.yForPrice(p1.price));
+        final b = Offset(geo.xForBar(p2.bar), geo.yForPrice(p2.price));
+        final c = Offset(geo.xForBar(p3.bar), geo.yForPrice(p3.price));
+        final v = b - a;
+        _drawInfiniteLine(canvas, geo, a, v, paint);
+        _drawInfiniteLine(canvas, geo, c, v, paint);
+        if (selected) _drawHandles(canvas, geo, [p1, p2, p3]);
+      case models.EllipseDrawing(:final p1, :final p2):
+        final a = Offset(geo.xForBar(p1.bar), geo.yForPrice(p1.price));
+        final b = Offset(geo.xForBar(p2.bar), geo.yForPrice(p2.price));
+        canvas.drawOval(Rect.fromPoints(a, b), paint);
+        if (selected) _drawHandles(canvas, geo, [p1, p2]);
+      case models.TextDrawing(:final p1, :final text):
+        final origin = Offset(geo.xForBar(p1.bar), geo.yForPrice(p1.price));
+        _drawText(canvas, text, origin - const Offset(0, 13), color, fontSize: 12);
+        if (selected) _drawHandles(canvas, geo, [p1]);
       case models.FibRetracementDrawing(:final high, :final low):
         final left = geo.xForBar(high.bar < low.bar ? high.bar : low.bar);
         final right = geo.xForBar(high.bar < low.bar ? low.bar : high.bar);
@@ -300,6 +323,39 @@ class CandleChartPainter extends CustomPainter {
       canvas.drawCircle(o, r + 1, stroke);
       canvas.drawCircle(o, r, paint);
     }
+  }
+
+  void _drawArrowHead(Canvas canvas, Offset base, Offset tip, Color color) {
+    final dir = tip - base;
+    final len = dir.distance;
+    if (len < 1) return;
+    final u = dir / len;
+    const arrowLen = 11.0;
+    const spread = 0.42;
+    final cos = math.cos(spread);
+    final sin = math.sin(spread);
+    final w1 = tip - Offset(u.dx * cos - u.dy * sin, u.dx * sin + u.dy * cos) * arrowLen;
+    final w2 = tip - Offset(u.dx * cos + u.dy * sin, -u.dx * sin + u.dy * cos) * arrowLen;
+    final head = Paint()
+      ..color = color
+      ..strokeWidth = 1.1
+      ..style = PaintingStyle.stroke;
+    canvas.drawLine(tip, w1, head);
+    canvas.drawLine(tip, w2, head);
+  }
+
+  /// Draws the infinite line through [a] in direction [v], clipped to the chart.
+  void _drawInfiniteLine(Canvas canvas, ChartGeometry geo, Offset a, Offset v, Paint paint) {
+    if (v.distance < 0.5) return;
+    if (v.dx == 0) {
+      canvas.drawLine(Offset(a.dx, 0), Offset(a.dx, geo.priceBottom), paint);
+      return;
+    }
+    final tLeft = -a.dx / v.dx;
+    final tRight = (geo.chartWidth - a.dx) / v.dx;
+    final t1 = tLeft < tRight ? tLeft : tRight;
+    final t2 = tLeft < tRight ? tRight : tLeft;
+    canvas.drawLine(a + v * t1, a + v * t2, paint);
   }
 
   // ------------------------------------------------------------------- crosshair

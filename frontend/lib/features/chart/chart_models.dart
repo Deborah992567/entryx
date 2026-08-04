@@ -1,6 +1,7 @@
 /// Chart domain models: timeframes, candles, overlays, and persistent drawings.
 library;
 
+import 'dart:math' as math;
 import 'dart:ui';
 
 import 'chart_geometry.dart';
@@ -100,7 +101,11 @@ enum DrawingTool {
   horizontal('Horizontal line'),
   vertical('Vertical line'),
   rectangle('Rectangle'),
-  fibonacci('Fibonacci retracement');
+  fibonacci('Fibonacci retracement'),
+  arrow('Arrow'),
+  channel('Channel'),
+  ellipse('Ellipse'),
+  text('Text label');
 
   const DrawingTool(this.label);
 
@@ -329,6 +334,202 @@ class RectangleDrawing extends ChartDrawing {
   }
 }
 
+class ArrowDrawing extends ChartDrawing {
+  const ArrowDrawing({required super.id, required this.p1, required this.p2, super.color});
+
+  /// Tail of the arrow; the head points toward [p2].
+  final ChartPoint p1;
+  final ChartPoint p2;
+
+  @override
+  Map<String, dynamic> toJson() => {
+        'type': 'arrow',
+        'id': id,
+        'color': color.toARGB32(),
+        'p1': p1.toJson(),
+        'p2': p2.toJson(),
+      };
+
+  factory ArrowDrawing.fromJson(Map<String, dynamic> json) => ArrowDrawing(
+        id: json['id'] as int,
+        color: Color(json['color'] as int? ?? 0xFF3B9EFF),
+        p1: ChartPoint.fromJson(json['p1'] as Map<String, dynamic>),
+        p2: ChartPoint.fromJson(json['p2'] as Map<String, dynamic>),
+      );
+
+  @override
+  ArrowDrawing translate(double dBars, double dPrice) => ArrowDrawing(
+        id: id,
+        color: color,
+        p1: p1.translate(dBars, dPrice),
+        p2: p2.translate(dBars, dPrice),
+      );
+
+  @override
+  bool hitTest(Offset point, ChartGeometry geo, {double tolerance = 6}) {
+    if (!geo.hasData) return false;
+    final a = Offset(geo.xForBar(p1.bar), geo.yForPrice(p1.price));
+    final b = Offset(geo.xForBar(p2.bar), geo.yForPrice(p2.price));
+    if (distanceToSegment(point, a, b) <= tolerance) return true;
+    final dir = b - a;
+    final len = dir.distance;
+    if (len < 1) return false;
+    final u = dir / len;
+    const arrowLen = 11.0;
+    const spread = 0.42;
+    final cos = math.cos(spread);
+    final sin = math.sin(spread);
+    final w1 = b - Offset(u.dx * cos - u.dy * sin, u.dx * sin + u.dy * cos) * arrowLen;
+    final w2 = b - Offset(u.dx * cos + u.dy * sin, -u.dx * sin + u.dy * cos) * arrowLen;
+    return distanceToSegment(point, b, w1) <= tolerance ||
+        distanceToSegment(point, b, w2) <= tolerance;
+  }
+}
+
+class ChannelDrawing extends ChartDrawing {
+  const ChannelDrawing({
+    required super.id,
+    required this.p1,
+    required this.p2,
+    required this.p3,
+    super.color,
+  });
+
+  /// The guide line passes through [p1] and [p2]; the second edge passes
+  /// through [p3] parallel to the guide.
+  final ChartPoint p1;
+  final ChartPoint p2;
+  final ChartPoint p3;
+
+  @override
+  Map<String, dynamic> toJson() => {
+        'type': 'channel',
+        'id': id,
+        'color': color.toARGB32(),
+        'p1': p1.toJson(),
+        'p2': p2.toJson(),
+        'p3': p3.toJson(),
+      };
+
+  factory ChannelDrawing.fromJson(Map<String, dynamic> json) => ChannelDrawing(
+        id: json['id'] as int,
+        color: Color(json['color'] as int? ?? 0xFF3B9EFF),
+        p1: ChartPoint.fromJson(json['p1'] as Map<String, dynamic>),
+        p2: ChartPoint.fromJson(json['p2'] as Map<String, dynamic>),
+        p3: ChartPoint.fromJson(json['p3'] as Map<String, dynamic>),
+      );
+
+  @override
+  ChannelDrawing translate(double dBars, double dPrice) => ChannelDrawing(
+        id: id,
+        color: color,
+        p1: p1.translate(dBars, dPrice),
+        p2: p2.translate(dBars, dPrice),
+        p3: p3.translate(dBars, dPrice),
+      );
+
+  @override
+  bool hitTest(Offset point, ChartGeometry geo, {double tolerance = 6}) {
+    if (!geo.hasData) return false;
+    final a = Offset(geo.xForBar(p1.bar), geo.yForPrice(p1.price));
+    final b = Offset(geo.xForBar(p2.bar), geo.yForPrice(p2.price));
+    final c = Offset(geo.xForBar(p3.bar), geo.yForPrice(p3.price));
+    final v = b - a;
+    if (v.distance < 1) return (point - a).distance <= tolerance;
+    return distanceToLine(point, a, v) <= tolerance ||
+        distanceToLine(point, c, v) <= tolerance;
+  }
+}
+
+class EllipseDrawing extends ChartDrawing {
+  const EllipseDrawing({required super.id, required this.p1, required this.p2, super.color});
+
+  /// The ellipse is inscribed in the box defined by [p1] and [p2].
+  final ChartPoint p1;
+  final ChartPoint p2;
+
+  @override
+  Map<String, dynamic> toJson() => {
+        'type': 'ellipse',
+        'id': id,
+        'color': color.toARGB32(),
+        'p1': p1.toJson(),
+        'p2': p2.toJson(),
+      };
+
+  factory EllipseDrawing.fromJson(Map<String, dynamic> json) => EllipseDrawing(
+        id: json['id'] as int,
+        color: Color(json['color'] as int? ?? 0xFF3B9EFF),
+        p1: ChartPoint.fromJson(json['p1'] as Map<String, dynamic>),
+        p2: ChartPoint.fromJson(json['p2'] as Map<String, dynamic>),
+      );
+
+  @override
+  EllipseDrawing translate(double dBars, double dPrice) => EllipseDrawing(
+        id: id,
+        color: color,
+        p1: p1.translate(dBars, dPrice),
+        p2: p2.translate(dBars, dPrice),
+      );
+
+  @override
+  bool hitTest(Offset point, ChartGeometry geo, {double tolerance = 6}) {
+    if (!geo.hasData) return false;
+    final a = Offset(geo.xForBar(p1.bar), geo.yForPrice(p1.price));
+    final b = Offset(geo.xForBar(p2.bar), geo.yForPrice(p2.price));
+    final rx = (a.dx - b.dx).abs() / 2 + tolerance;
+    final ry = (a.dy - b.dy).abs() / 2 + tolerance;
+    if (rx <= tolerance || ry <= tolerance) {
+      return Rect.fromPoints(a, b).inflate(tolerance).contains(point);
+    }
+    final cx = (a.dx + b.dx) / 2;
+    final cy = (a.dy + b.dy) / 2;
+    final dx = (point.dx - cx) / rx;
+    final dy = (point.dy - cy) / ry;
+    return dx * dx + dy * dy <= 1;
+  }
+}
+
+class TextDrawing extends ChartDrawing {
+  const TextDrawing({required super.id, required this.p1, required this.text, super.color});
+
+  /// Anchor point (top-left of the label in bar/price space).
+  final ChartPoint p1;
+  final String text;
+
+  @override
+  Map<String, dynamic> toJson() => {
+        'type': 'text',
+        'id': id,
+        'color': color.toARGB32(),
+        'p1': p1.toJson(),
+        'text': text,
+      };
+
+  factory TextDrawing.fromJson(Map<String, dynamic> json) => TextDrawing(
+        id: json['id'] as int,
+        color: Color(json['color'] as int? ?? 0xFF3B9EFF),
+        p1: ChartPoint.fromJson(json['p1'] as Map<String, dynamic>),
+        text: json['text'] as String? ?? '',
+      );
+
+  @override
+  TextDrawing translate(double dBars, double dPrice) => TextDrawing(
+        id: id,
+        color: color,
+        p1: p1.translate(dBars, dPrice),
+        text: text,
+      );
+
+  @override
+  bool hitTest(Offset point, ChartGeometry geo, {double tolerance = 6}) {
+    if (!geo.hasData) return false;
+    final origin = Offset(geo.xForBar(p1.bar), geo.yForPrice(p1.price));
+    final rect = Rect.fromLTWH(origin.dx, origin.dy - 13, text.length * 6.5 + 8, 16);
+    return rect.inflate(tolerance).contains(point);
+  }
+}
+
 class FibRetracementDrawing extends ChartDrawing {
   const FibRetracementDrawing({required super.id, required this.p1, required this.p2, super.color});
 
@@ -392,6 +593,10 @@ ChartDrawing chartDrawingFromJson(Map<String, dynamic> json) => switch (json['ty
       'horizontal' => HorizontalLineDrawing.fromJson(json),
       'vertical' => VerticalLineDrawing.fromJson(json),
       'rectangle' => RectangleDrawing.fromJson(json),
+      'arrow' => ArrowDrawing.fromJson(json),
+      'channel' => ChannelDrawing.fromJson(json),
+      'ellipse' => EllipseDrawing.fromJson(json),
+      'text' => TextDrawing.fromJson(json),
       'fibonacci' => FibRetracementDrawing.fromJson(json),
       _ => throw FormatException('unknown drawing type: ${json['type']}'),
     };

@@ -64,7 +64,15 @@ void main() {
           HorizontalLineDrawing(id: 3, price: 105.25),
           VerticalLineDrawing(id: 4, bar: 42),
           RectangleDrawing(id: 5, p1: const ChartPoint(20, 102), p2: const ChartPoint(70, 108)),
-          FibRetracementDrawing(id: 6, p1: const ChartPoint(10, 110), p2: const ChartPoint(90, 100)),
+          ArrowDrawing(id: 6, p1: const ChartPoint(10, 100), p2: const ChartPoint(90, 110)),
+          ChannelDrawing(
+              id: 7,
+              p1: const ChartPoint(10, 100),
+              p2: const ChartPoint(90, 110),
+              p3: const ChartPoint(10, 102)),
+          EllipseDrawing(id: 8, p1: const ChartPoint(20, 102), p2: const ChartPoint(70, 108)),
+          TextDrawing(id: 9, p1: const ChartPoint(50, 105), text: 'breakout'),
+          FibRetracementDrawing(id: 10, p1: const ChartPoint(10, 110), p2: const ChartPoint(90, 100)),
         ];
 
     test('round-trips every drawing type', () {
@@ -125,6 +133,54 @@ void main() {
       expect(fib.hitTest(Offset(g.xForBar(50), g.yForPrice(105)), g), isTrue);
       // 103 is midway between levels 0.618 (103.82) and 0.786 (102.14) -> no hit
       expect(fib.hitTest(Offset(g.xForBar(50), g.yForPrice(103)), g), isFalse);
+    });
+
+    test('arrow hits on its shaft or arrowhead', () {
+      final g = geo();
+      final arrow = ArrowDrawing(
+          id: 1, p1: const ChartPoint(10, 100), p2: const ChartPoint(90, 110));
+      final a = Offset(g.xForBar(10), g.yForPrice(100));
+      final b = Offset(g.xForBar(90), g.yForPrice(110));
+      expect(arrow.hitTest((a + b) / 2, g), isTrue);
+      expect(arrow.hitTest(b, g), isTrue); // tip is on the arrowhead
+      expect(arrow.hitTest(Offset(g.xForBar(50), g.yForPrice(100)), g), isFalse);
+    });
+
+    test('channel hits on either parallel edge, not between them', () {
+      final g = geo();
+      final channel = ChannelDrawing(
+          id: 1,
+          p1: const ChartPoint(10, 100),
+          p2: const ChartPoint(90, 110),
+          p3: const ChartPoint(10, 102));
+      final a = Offset(g.xForBar(10), g.yForPrice(100));
+      expect(channel.hitTest(a, g), isTrue); // on the guide edge
+      // The parallel edge passes through p3; at bar 50 it sits at price 107.
+      expect(channel.hitTest(Offset(g.xForBar(50), g.yForPrice(107)), g), isTrue);
+      expect(channel.hitTest(Offset(g.xForBar(50), g.yForPrice(105)), g), isTrue);
+      // Midway between the two edges (price 106) is not on either line.
+      expect(channel.hitTest(Offset(g.xForBar(50), g.yForPrice(106)), g), isFalse);
+      expect(channel.hitTest(const Offset(5, 5), g), isFalse);
+    });
+
+    test('ellipse hits inside, not on corners outside the oval', () {
+      final g = geo();
+      final ellipse = EllipseDrawing(
+          id: 1, p1: const ChartPoint(30, 103), p2: const ChartPoint(70, 107));
+      final center = Offset(g.xForBar(50), g.yForPrice(105));
+      expect(ellipse.hitTest(center, g), isTrue);
+      // Corner of the bounding box: inside the rect but outside the oval.
+      final corner = Offset(g.xForBar(30), g.yForPrice(103));
+      expect(ellipse.hitTest(corner, g), isFalse);
+      expect(ellipse.hitTest(Offset(g.xForBar(80), g.yForPrice(102)), g), isFalse);
+    });
+
+    test('text hits within its label bounds', () {
+      final g = geo();
+      final text = TextDrawing(id: 1, p1: const ChartPoint(50, 105), text: 'breakout');
+      final origin = Offset(g.xForBar(50), g.yForPrice(105));
+      expect(text.hitTest(origin - const Offset(0, 10), g), isTrue);
+      expect(text.hitTest(origin + const Offset(20, 20), g), isFalse);
     });
   });
 
@@ -191,6 +247,14 @@ void main() {
         drawings: [
           TrendLineDrawing(id: 1, p1: const ChartPoint(10, 100), p2: const ChartPoint(90, 110)),
           FibRetracementDrawing(id: 2, p1: const ChartPoint(10, 110), p2: const ChartPoint(90, 100)),
+          ArrowDrawing(id: 3, p1: const ChartPoint(10, 100), p2: const ChartPoint(90, 110)),
+          ChannelDrawing(
+              id: 4,
+              p1: const ChartPoint(10, 100),
+              p2: const ChartPoint(90, 110),
+              p3: const ChartPoint(10, 102)),
+          EllipseDrawing(id: 5, p1: const ChartPoint(20, 102), p2: const ChartPoint(70, 108)),
+          TextDrawing(id: 6, p1: const ChartPoint(50, 105), text: 'breakout'),
         ],
         selectedDrawingId: 1,
         overlays: const [],
