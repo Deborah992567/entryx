@@ -41,6 +41,11 @@ class WorkspaceStore extends ChangeNotifier {
     _apply(_layout.splitPanel(panelId, orientation: orientation, type: type));
   }
 
+  /// Merge per-panel settings (e.g. the chart template) into the layout.
+  void setPanelSettings(String panelId, Map<String, dynamic> settings) {
+    _apply(_layout.withPanelSettings(panelId, settings));
+  }
+
   void _apply(DockLayout next) {
     if (next.toJson().toString() == _layout.toJson().toString()) return;
     _layout = next;

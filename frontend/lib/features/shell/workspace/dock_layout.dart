@@ -32,15 +32,27 @@ sealed class DockNode {
 }
 
 class PanelNode extends DockNode {
-  const PanelNode({required super.id, required this.type, this.collapsed = false});
+  const PanelNode({
+    required super.id,
+    required this.type,
+    this.collapsed = false,
+    this.settings = const {},
+  });
 
   final PanelType type;
   final bool collapsed;
 
-  @override
-  PanelNode copy() => PanelNode(id: id, type: type, collapsed: collapsed);
+  /// Per-panel settings persisted with the layout (e.g. `{'template': 'ocean'}`).
+  final Map<String, dynamic> settings;
 
-  PanelNode withCollapsed(bool value) => PanelNode(id: id, type: type, collapsed: value);
+  @override
+  PanelNode copy() => PanelNode(id: id, type: type, collapsed: collapsed, settings: Map.of(settings));
+
+  PanelNode withCollapsed(bool value) =>
+      PanelNode(id: id, type: type, collapsed: value, settings: Map.of(settings));
+
+  PanelNode withSettings(Map<String, dynamic> value) =>
+      PanelNode(id: id, type: type, collapsed: collapsed, settings: Map.of(value));
 }
 
 class DockChild {
@@ -151,6 +163,7 @@ class DockLayout {
             orElse: () => PanelType.chart,
           ),
           collapsed: json['collapsed'] as bool? ?? false,
+          settings: (json['settings'] as Map<String, dynamic>?) ?? const {},
         );
       case 'split':
         return SplitNode(
@@ -180,6 +193,7 @@ class DockLayout {
         'kind': 'panel',
         'type': node.type.id,
         'collapsed': node.collapsed,
+        if (node.settings.isNotEmpty) 'settings': node.settings,
       };
     }
     final split = node as SplitNode;
@@ -281,6 +295,16 @@ class DockLayout {
     return DockLayout(_copyWith(root, (node) {
       if (node is PanelNode && node.id == panelId) {
         return node.withCollapsed(!node.collapsed);
+      }
+      return node;
+    }));
+  }
+
+  /// Set (merge) the settings map on a single panel.
+  DockLayout withPanelSettings(String panelId, Map<String, dynamic> settings) {
+    return DockLayout(_copyWith(root, (node) {
+      if (node is PanelNode && node.id == panelId) {
+        return node.withSettings({...node.settings, ...settings});
       }
       return node;
     }));

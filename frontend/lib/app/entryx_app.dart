@@ -70,6 +70,7 @@ class _EntryXAppState extends State<EntryXApp> {
           ChangeNotifierProvider.value(value: _auth),
           ChangeNotifierProvider.value(value: _marketWatch),
           ChangeNotifierProvider.value(value: _charts),
+          ChangeNotifierProvider.value(value: _workspace),
         ],
         child: ListenableBuilder(
           listenable: _auth,

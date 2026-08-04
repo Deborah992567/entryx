@@ -36,7 +36,7 @@ Legend: `[x]` done · `[~]` in progress · `[ ]` planned
 - [x] Drawing tools: trendline, ray, h/v lines, rectangle, Fibonacci retracement/extension/
   fan, arrow, channel, ellipse, text label, pitchfork, S/R zones — movable/editable/
   persistent per chart (client + backend persistence)
-- [ ] Chart templates, themes, layout persistence integration
+- [x] Chart templates, themes, layout persistence integration
 
 ## PHASE 4 — Trading engine + risk
 
@@ -102,8 +102,7 @@ Legend: `[x]` done · `[~]` in progress · `[ ]` planned
 |---|---|---|
 | 1 | Foundation | done |
 | 2 | Market data + paper broker + real-time | done |
-| 3 | Chart engine + indicators + drawings | in progress |
-| 3 | Chart engine + indicators + drawings | planned |
+| 3 | Chart engine + indicators + drawings | done |
 | 4 | Trading engine + risk | planned |
 | 5 | Strategy + backtesting + optimization | planned |
 | 6 | Market structure + SMC | planned |

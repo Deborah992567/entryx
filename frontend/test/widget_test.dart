@@ -73,6 +73,31 @@ void main() {
     expect(ids.length, b.panels.length);
   });
 
+  test('withPanelSettings merges per-panel settings and keeps others empty', () {
+    final layout = DockLayout.defaultLayout();
+    final updated = layout.withPanelSettings('panel.chart', {'template': 'ocean'});
+    expect(updated.panel('panel.chart')!.settings, {'template': 'ocean'});
+    expect(updated.panel('panel.marketwatch')!.settings, isEmpty);
+    expect(layout.panel('panel.chart')!.settings, isEmpty);
+  });
+
+  test('panel settings round-trip through the layout JSON', () {
+    final layout =
+        DockLayout.defaultLayout().withPanelSettings('panel.chart', {'template': 'ocean'});
+    final restored = DockLayout.fromJson(layout.toJson());
+    expect(restored.panel('panel.chart')!.settings, {'template': 'ocean'});
+    expect(restored.panel('panel.marketwatch')!.settings, isEmpty);
+  });
+
+  test('splitting a panel preserves its settings and swaps keep them', () {
+    final layout =
+        DockLayout.defaultLayout().withPanelSettings('panel.chart', {'template': 'ocean'});
+    final split = layout.splitPanel('panel.chart',
+        orientation: DockOrientation.horizontal, type: PanelType.chart);
+    expect(split.panel('panel.chart')!.settings, {'template': 'ocean'});
+    expect(split.panels.last.settings, isEmpty);
+  });
+
   testWidgets('app boots to the auth screen when no session exists', (tester) async {
     await tester.pumpWidget(const EntryXApp());
     expect(find.byType(AuthScreen), findsNothing);

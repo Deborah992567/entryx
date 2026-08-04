@@ -15,7 +15,9 @@ import '../chart/chart_geometry.dart';
 import '../chart/chart_models.dart';
 import '../chart/chart_store.dart';
 import '../chart/chart_store_registry.dart';
+import '../chart/chart_template.dart';
 import '../market/market_watch_store.dart';
+import '../shell/workspace/workspace_store.dart';
 
 class ChartPanel extends StatefulWidget {
   const ChartPanel({super.key, required this.storeKey});
@@ -37,10 +39,24 @@ class _ChartPanelState extends State<ChartPanel> {
   Widget build(BuildContext context) {
     final store = context.read<ChartStoreRegistry>().storeFor(widget.storeKey);
     final watch = context.watch<MarketWatchStore>();
+    _applyPersistedTemplate(context, store);
     return ListenableBuilder(
       listenable: store,
       builder: (context, _) => _buildPanel(store, watch),
     );
+  }
+
+  /// Syncs the store's template from the panel settings in the persisted
+  /// layout. Runs after the frame to avoid notifying the store mid-build.
+  void _applyPersistedTemplate(BuildContext context, ChartStore store) {
+    final settings = context.read<WorkspaceStore>().layout.panel(widget.storeKey)?.settings;
+    final id = settings?['template'];
+    if (id is String && ChartTemplate.byId(id).id != store.template.id) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        store.setTemplate(ChartTemplate.byId(id));
+      });
+    }
   }
 
   Widget _buildPanel(ChartStore store, MarketWatchStore watch) {
@@ -56,6 +72,7 @@ class _ChartPanelState extends State<ChartPanel> {
           store: store,
           watch: watch,
           onToggleSync: () => _toggleSync(store),
+          onTemplateSelected: (template) => _selectTemplate(template),
         ),
         const Divider(height: 1),
         _DrawingToolbar(
@@ -119,6 +136,7 @@ class _ChartPanelState extends State<ChartPanel> {
                         drawings: store.drawings,
                         selectedDrawingId: store.selectedDrawingId,
                         draft: _draft,
+                        template: store.template,
                       ),
                       size: Size(constraints.maxWidth, constraints.maxHeight),
                     ),
@@ -276,6 +294,12 @@ class _ChartPanelState extends State<ChartPanel> {
     context.read<ChartStoreRegistry>().setSynced(widget.storeKey, !store.synced);
   }
 
+  void _selectTemplate(ChartTemplate template) {
+    final store = context.read<ChartStoreRegistry>().storeFor(widget.storeKey);
+    store.setTemplate(template);
+    context.read<WorkspaceStore>().setPanelSettings(widget.storeKey, {'template': template.id});
+  }
+
   /// Multi-point tools (channel, pitchfork) are drawn in two drags: the first
   /// sets the two base anchors, the second sets the final anchor.
   void _finishMultiPointDrag(ChartStore store, ChartGeometry geo, Object draft) {
@@ -388,11 +412,17 @@ class _ChartPanelState extends State<ChartPanel> {
 }
 
 class _Toolbar extends StatelessWidget {
-  const _Toolbar({required this.store, required this.watch, required this.onToggleSync});
+  const _Toolbar({
+    required this.store,
+    required this.watch,
+    required this.onToggleSync,
+    required this.onTemplateSelected,
+  });
 
   final ChartStore store;
   final MarketWatchStore watch;
   final VoidCallback onToggleSync;
+  final ValueChanged<ChartTemplate> onTemplateSelected;
 
   @override
   Widget build(BuildContext context) {
@@ -434,6 +464,8 @@ class _Toolbar extends StatelessWidget {
             ),
           ),
           _IndicatorMenu(store: store),
+          const SizedBox(width: 6),
+          _TemplateMenu(template: store.template, onSelected: onTemplateSelected),
           const SizedBox(width: 6),
           IconButton(
             onPressed: onToggleSync,
@@ -623,6 +655,53 @@ class _IndicatorMenu extends StatelessWidget {
             value: entry.key,
             checked: store.indicatorEnabled(entry.key),
             child: Text(entry.value, style: const TextStyle(fontSize: 12)),
+          ),
+      ],
+    );
+  }
+}
+
+class _TemplateMenu extends StatelessWidget {
+  const _TemplateMenu({required this.template, required this.onSelected});
+
+  final ChartTemplate template;
+  final ValueChanged<ChartTemplate> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return PopupMenuButton<ChartTemplate>(
+      onSelected: onSelected,
+      tooltip: 'Chart template',
+      icon: const Icon(Icons.palette_outlined, size: 15, color: EntryXColors.textDim),
+      color: EntryXColors.bgRaised,
+      itemBuilder: (context) => [
+        for (final t in ChartTemplate.all)
+          PopupMenuItem<ChartTemplate>(
+            value: t,
+            child: Row(
+              children: [
+                Container(
+                  width: 18,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(2),
+                    border: Border.all(color: EntryXColors.border),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(child: ColoredBox(color: t.up)),
+                      Expanded(child: ColoredBox(color: t.down)),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(t.label, style: const TextStyle(fontSize: 12)),
+                if (template.id == t.id) ...[
+                  const Spacer(),
+                  const Icon(Icons.check, size: 14, color: EntryXColors.accentBright),
+                ],
+              ],
+            ),
           ),
       ],
     );

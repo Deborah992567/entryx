@@ -13,6 +13,7 @@ import 'package:flutter/foundation.dart';
 import '../../core/api_client.dart';
 import '../../core/ws_client.dart';
 import 'chart_models.dart';
+import 'chart_template.dart';
 import 'indicator_engine.dart';
 
 class ChartStore extends ChangeNotifier {
@@ -47,6 +48,7 @@ class ChartStore extends ChangeNotifier {
   int _right = -1; // -1 = follow the newest bar
   int? _crosshairIndex;
   double? _crosshairPrice;
+  ChartTemplate _template = ChartTemplate.dark;
 
   List<ChartDrawing> _drawings = [];
   int? _selectedDrawingId;
@@ -67,6 +69,7 @@ class ChartStore extends ChangeNotifier {
 
   String get symbol => _symbol;
   Timeframe get timeframe => _timeframe;
+  ChartTemplate get template => _template;
   List<ChartCandle> get candles => _candles;
   bool get loading => _loading;
   String get error => _error;
@@ -168,6 +171,12 @@ class ChartStore extends ChangeNotifier {
   void toggleIndicator(String key) {
     if (!_indicatorEnabled.containsKey(key)) return;
     _indicatorEnabled[key] = !(_indicatorEnabled[key] ?? false);
+    notifyListeners();
+  }
+
+  void setTemplate(ChartTemplate template) {
+    if (identical(_template, template) || _template.id == template.id) return;
+    _template = template;
     notifyListeners();
   }
 

@@ -12,6 +12,7 @@ import 'package:flutter/widgets.dart' hide Overlay;
 
 import 'chart_geometry.dart';
 import 'chart_models.dart' as models;
+import 'chart_template.dart';
 
 class CandleChartPainter extends CustomPainter {
   CandleChartPainter({
@@ -28,6 +29,7 @@ class CandleChartPainter extends CustomPainter {
     this.selectedDrawingId,
     this.draft,
     this.lastPrice,
+    this.template = ChartTemplate.dark,
   });
 
   final List<models.ChartCandle> candles;
@@ -43,6 +45,7 @@ class CandleChartPainter extends CustomPainter {
   final int? selectedDrawingId;
   final models.ChartDrawing? draft;
   final double? lastPrice;
+  final ChartTemplate template;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -100,7 +103,7 @@ class CandleChartPainter extends CustomPainter {
 
   void _drawGridAndScale(Canvas canvas, ChartGeometry geo) {
     final grid = Paint()
-      ..color = const Color(0xFF242B36).withValues(alpha: 0.55)
+      ..color = template.grid.withValues(alpha: 0.55)
       ..strokeWidth = 0.5;
     final rect = geo.priceRect;
 
@@ -111,7 +114,7 @@ class CandleChartPainter extends CustomPainter {
       final y = geo.yForPrice(price);
       canvas.drawLine(Offset(0, y), Offset(rect.width, y), grid);
       _drawText(canvas, price.toStringAsFixed(decimals), Offset(rect.width + 6, y - 6),
-          const Color(0xFF8B95A5), fontSize: 9.5);
+          template.axisText, fontSize: 9.5);
       price += step;
     }
 
@@ -120,7 +123,7 @@ class CandleChartPainter extends CustomPainter {
       final x = geo.xForBar(i.toDouble());
       canvas.drawLine(Offset(x, 0), Offset(x, rect.height), grid);
       _drawText(canvas, _formatTime(candles[i].ts), Offset(x - 14, rect.bottom + 4),
-          const Color(0xFF8B95A5), fontSize: 9.5);
+          template.axisText, fontSize: 9.5);
     }
   }
 
@@ -133,7 +136,7 @@ class CandleChartPainter extends CustomPainter {
       final candle = candles[i];
       final x = geo.xForBar(i.toDouble());
       final height = maxV <= 0 ? 0.0 : (candle.v / maxV) * rect.height;
-      paint.color = (candle.isBullish ? const Color(0xFF2ECC71) : const Color(0xFFE74C3C))
+      paint.color = (candle.isBullish ? template.up : template.down)
           .withValues(alpha: 0.55);
       final bodyWidth = math.max(1.0, math.min(14.0, geo.barWidth * 0.72));
       canvas.drawRect(
@@ -151,7 +154,7 @@ class CandleChartPainter extends CustomPainter {
     final body = Paint();
     for (var i = start; i < end; i++) {
       final candle = candles[i];
-      final color = candle.isBullish ? const Color(0xFF2ECC71) : const Color(0xFFE74C3C);
+      final color = candle.isBullish ? template.up : template.down;
       final x = geo.xForBar(i.toDouble());
       wick.color = color;
       canvas.drawLine(Offset(x, geo.yForPrice(candle.h)), Offset(x, geo.yForPrice(candle.low)), wick);
@@ -359,7 +362,7 @@ class CandleChartPainter extends CustomPainter {
   void _drawHandles(Canvas canvas, ChartGeometry geo, List<models.ChartPoint> points) {
     final paint = Paint()..color = const Color(0xFFFFFFFF);
     final stroke = Paint()
-      ..color = const Color(0xFF3B9EFF)
+      ..color = template.accent
       ..strokeWidth = 1;
     for (final p in points) {
       final o = Offset(geo.xForBar(p.bar), geo.yForPrice(p.price));
@@ -419,7 +422,7 @@ class CandleChartPainter extends CustomPainter {
   void _drawCrosshair(Canvas canvas, ChartGeometry geo, int index, double? price) {
     final x = geo.xForBar(index.toDouble());
     final line = Paint()
-      ..color = const Color(0xFF8B95A5).withValues(alpha: 0.9)
+      ..color = template.crosshair.withValues(alpha: 0.9)
       ..strokeWidth = 0.8;
     canvas.drawLine(Offset(x, 0), Offset(x, geo.priceBottom), line);
 
@@ -427,7 +430,7 @@ class CandleChartPainter extends CustomPainter {
     final y = geo.yForPrice(p);
     canvas.drawLine(Offset(0, y), Offset(geo.chartWidth, y), line);
 
-    final tag = Paint()..color = const Color(0xFF3B9EFF);
+    final tag = Paint()..color = template.accent;
     final label = p.toStringAsFixed(geo.decimalsFor((geo.maxPrice - geo.minPrice) / 40));
     final tp = TextPainter(
       text: TextSpan(
@@ -449,7 +452,7 @@ class CandleChartPainter extends CustomPainter {
       textDirection: TextDirection.ltr,
     )..layout();
     final w = tp.width + 12;
-    final paint = Paint()..color = const Color(0xFF3B9EFF);
+    final paint = Paint()..color = template.accent;
     canvas.drawRect(Rect.fromLTWH(geo.chartWidth + 1, geo.yForPrice(price) - 7, w, 14), paint);
     tp.paint(canvas, Offset(geo.chartWidth + 7, geo.yForPrice(price) - 5.5));
   }
@@ -459,17 +462,17 @@ class CandleChartPainter extends CustomPainter {
   void _drawOhlc(Canvas canvas, ChartGeometry geo, int index) {
     if (index < 0 || index >= candles.length) return;
     final c = candles[index];
-    final color = c.isBullish ? const Color(0xFF2ECC71) : const Color(0xFFE74C3C);
+    final color = c.isBullish ? template.up : template.down;
     final parts = <TextSpan>[
       TextSpan(
         text: symbol.isEmpty ? '' : '$symbol  ',
-        style: const TextStyle(color: Color(0xFF8B95A5)),
+        style: TextStyle(color: template.axisText),
       ),
       TextSpan(
         text: 'O ${_price(c.o)}  H ${_price(c.h)}  L ${_price(c.low)}  C ${_price(c.c)}  ',
         style: TextStyle(color: color),
       ),
-      TextSpan(text: 'V ${_vol(c.v)}', style: const TextStyle(color: Color(0xFF8B95A5))),
+      TextSpan(text: 'V ${_vol(c.v)}', style: TextStyle(color: template.axisText)),
     ];
     final tp = TextPainter(
       text: TextSpan(style: const TextStyle(fontSize: 10), children: parts),
@@ -492,7 +495,7 @@ class CandleChartPainter extends CustomPainter {
 
   String _two(int v) => v.toString().padLeft(2, '0');
 
-  Color _colorForOverlay(String label) => models.overlayColors[label] ?? const Color(0xFF3B9EFF);
+  Color _colorForOverlay(String label) => models.overlayColors[label] ?? template.accent;
 
   void _drawText(
     Canvas canvas,

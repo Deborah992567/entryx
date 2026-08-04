@@ -2,6 +2,7 @@ import 'package:entryx/core/api_client.dart';
 import 'package:entryx/core/ws_client.dart';
 import 'package:entryx/features/chart/chart_models.dart';
 import 'package:entryx/features/chart/chart_store.dart';
+import 'package:entryx/features/chart/chart_template.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 Map<String, dynamic> candleJson(int ts, {double o = 100, double h = 102, double l = 99, double c = 101, double v = 10}) =>
@@ -191,6 +192,18 @@ void main() {
     expect(store.crosshairIndex, 5);
     expect(store.crosshairPrice, closeTo(101.5, 1e-6));
     expect(store.activeBarIndex, 5);
+  });
+
+  test('template defaults to dark and setTemplate updates + notifies', () async {
+    await Future<void>.delayed(Duration.zero);
+    expect(store.template, ChartTemplate.dark);
+    var notified = 0;
+    store.addListener(() => notified++);
+    store.setTemplate(ChartTemplate.ocean);
+    expect(store.template, ChartTemplate.ocean);
+    expect(notified, 1);
+    store.setTemplate(ChartTemplate.ocean);
+    expect(notified, 1); // idempotent
   });
 
   test('drawing mutations are saved after the debounce', () async {
