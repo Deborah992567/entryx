@@ -72,7 +72,16 @@ void main() {
               p3: const ChartPoint(10, 102)),
           EllipseDrawing(id: 8, p1: const ChartPoint(20, 102), p2: const ChartPoint(70, 108)),
           TextDrawing(id: 9, p1: const ChartPoint(50, 105), text: 'breakout'),
-          FibRetracementDrawing(id: 10, p1: const ChartPoint(10, 110), p2: const ChartPoint(90, 100)),
+          FibFanDrawing(id: 10, p1: const ChartPoint(10, 100), p2: const ChartPoint(90, 110)),
+          FibExtensionDrawing(
+              id: 11, p1: const ChartPoint(10, 100), p2: const ChartPoint(90, 110)),
+          PitchforkDrawing(
+              id: 12,
+              p1: const ChartPoint(10, 105),
+              p2: const ChartPoint(20, 110),
+              p3: const ChartPoint(20, 100)),
+          SRZoneDrawing(id: 13, p1: const ChartPoint(10, 110), p2: const ChartPoint(90, 100)),
+          FibRetracementDrawing(id: 14, p1: const ChartPoint(10, 110), p2: const ChartPoint(90, 100)),
         ];
 
     test('round-trips every drawing type', () {
@@ -182,6 +191,51 @@ void main() {
       expect(text.hitTest(origin - const Offset(0, 10), g), isTrue);
       expect(text.hitTest(origin + const Offset(20, 20), g), isFalse);
     });
+
+    test('fib fan hits on a fan line, not between them', () {
+      final g = geo();
+      final fan = FibFanDrawing(
+          id: 1, p1: const ChartPoint(10, 100), p2: const ChartPoint(90, 110));
+      // Level 0.5 radiates through (bar 90, price 105).
+      final onLine = Offset(g.xForBar(90), g.yForPrice(105));
+      expect(fan.hitTest(onLine, g), isTrue);
+      // Between the 0.5 (105) and 0.618 (103.82) rays at bar 90.
+      expect(fan.hitTest(Offset(g.xForBar(90), g.yForPrice(104.4)), g), isFalse);
+      expect(fan.hitTest(const Offset(5, 5), g), isFalse);
+    });
+
+    test('fib extension hits on projected levels', () {
+      final g = geo();
+      final ext = FibExtensionDrawing(
+          id: 1, p1: const ChartPoint(10, 100), p2: const ChartPoint(90, 110));
+      // 100% level = 110, 161.8% level = 116.18.
+      expect(ext.hitTest(Offset(g.xForBar(50), g.yForPrice(110)), g), isTrue);
+      expect(ext.hitTest(Offset(g.xForBar(50), g.yForPrice(116.18)), g), isTrue);
+      expect(ext.hitTest(Offset(g.xForBar(50), g.yForPrice(113)), g), isFalse);
+    });
+
+    test('pitchfork hits on the median and both prongs', () {
+      final g = geo();
+      final fork = PitchforkDrawing(
+          id: 1,
+          p1: const ChartPoint(10, 105),
+          p2: const ChartPoint(20, 110),
+          p3: const ChartPoint(20, 100));
+      // Median runs horizontally from (10,105); prongs at 110 and 100.
+      expect(fork.hitTest(Offset(g.xForBar(50), g.yForPrice(105)), g), isTrue);
+      expect(fork.hitTest(Offset(g.xForBar(50), g.yForPrice(110)), g), isTrue);
+      expect(fork.hitTest(Offset(g.xForBar(50), g.yForPrice(100)), g), isTrue);
+      expect(fork.hitTest(Offset(g.xForBar(50), g.yForPrice(107)), g), isFalse);
+    });
+
+    test('S/R zone hits inside the band and on its borders', () {
+      final g = geo();
+      final zone = SRZoneDrawing(
+          id: 1, p1: const ChartPoint(10, 110), p2: const ChartPoint(90, 100));
+      expect(zone.hitTest(Offset(g.xForBar(50), g.yForPrice(105)), g), isTrue);
+      expect(zone.hitTest(Offset(g.xForBar(50), g.yForPrice(110)), g), isTrue);
+      expect(zone.hitTest(Offset(g.xForBar(50), g.yForPrice(95)), g), isFalse);
+    });
   });
 
   group('store drawing ops', () {
@@ -255,6 +309,15 @@ void main() {
               p3: const ChartPoint(10, 102)),
           EllipseDrawing(id: 5, p1: const ChartPoint(20, 102), p2: const ChartPoint(70, 108)),
           TextDrawing(id: 6, p1: const ChartPoint(50, 105), text: 'breakout'),
+          FibFanDrawing(id: 7, p1: const ChartPoint(10, 100), p2: const ChartPoint(90, 110)),
+          FibExtensionDrawing(
+              id: 8, p1: const ChartPoint(10, 100), p2: const ChartPoint(90, 110)),
+          PitchforkDrawing(
+              id: 9,
+              p1: const ChartPoint(10, 105),
+              p2: const ChartPoint(20, 110),
+              p3: const ChartPoint(20, 100)),
+          SRZoneDrawing(id: 10, p1: const ChartPoint(10, 110), p2: const ChartPoint(90, 100)),
         ],
         selectedDrawingId: 1,
         overlays: const [],

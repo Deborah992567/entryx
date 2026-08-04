@@ -105,7 +105,11 @@ enum DrawingTool {
   arrow('Arrow'),
   channel('Channel'),
   ellipse('Ellipse'),
-  text('Text label');
+  text('Text label'),
+  fibFan('Fibonacci fan'),
+  fibExtension('Fibonacci extension'),
+  pitchfork('Pitchfork'),
+  sr('S/R zone');
 
   const DrawingTool(this.label);
 
@@ -530,6 +534,207 @@ class TextDrawing extends ChartDrawing {
   }
 }
 
+class FibFanDrawing extends ChartDrawing {
+  const FibFanDrawing({required super.id, required this.p1, required this.p2, super.color});
+
+  /// Fan lines radiate from [p1] through projected points of the move [p1]→[p2].
+  final ChartPoint p1;
+  final ChartPoint p2;
+
+  static const List<double> levels = [0.236, 0.382, 0.5, 0.618, 0.786];
+
+  double levelPrice(double fraction) => p1.price - (p1.price - p2.price) * fraction;
+
+  @override
+  Map<String, dynamic> toJson() => {
+        'type': 'fibfan',
+        'id': id,
+        'color': color.toARGB32(),
+        'p1': p1.toJson(),
+        'p2': p2.toJson(),
+      };
+
+  factory FibFanDrawing.fromJson(Map<String, dynamic> json) => FibFanDrawing(
+        id: json['id'] as int,
+        color: Color(json['color'] as int? ?? 0xFF3B9EFF),
+        p1: ChartPoint.fromJson(json['p1'] as Map<String, dynamic>),
+        p2: ChartPoint.fromJson(json['p2'] as Map<String, dynamic>),
+      );
+
+  @override
+  FibFanDrawing translate(double dBars, double dPrice) => FibFanDrawing(
+        id: id,
+        color: color,
+        p1: p1.translate(dBars, dPrice),
+        p2: p2.translate(dBars, dPrice),
+      );
+
+  @override
+  bool hitTest(Offset point, ChartGeometry geo, {double tolerance = 6}) {
+    if (!geo.hasData) return false;
+    final origin = Offset(geo.xForBar(p1.bar), geo.yForPrice(p1.price));
+    for (final f in levels) {
+      final through = Offset(geo.xForBar(p2.bar), geo.yForPrice(levelPrice(f)));
+      if (distanceToRay(point, origin, through) <= tolerance) return true;
+    }
+    return false;
+  }
+}
+
+class FibExtensionDrawing extends ChartDrawing {
+  const FibExtensionDrawing({required super.id, required this.p1, required this.p2, super.color});
+
+  /// Extension targets projected beyond the [p1]→[p2] move.
+  final ChartPoint p1;
+  final ChartPoint p2;
+
+  static const List<double> levels = [0.618, 1.0, 1.272, 1.618, 2.618];
+
+  double levelPrice(double fraction) => p1.price + (p2.price - p1.price) * fraction;
+
+  double get _leftBar => p1.bar < p2.bar ? p1.bar : p2.bar;
+  double get _rightBar => p1.bar < p2.bar ? p2.bar : p1.bar;
+
+  @override
+  Map<String, dynamic> toJson() => {
+        'type': 'fibext',
+        'id': id,
+        'color': color.toARGB32(),
+        'p1': p1.toJson(),
+        'p2': p2.toJson(),
+      };
+
+  factory FibExtensionDrawing.fromJson(Map<String, dynamic> json) => FibExtensionDrawing(
+        id: json['id'] as int,
+        color: Color(json['color'] as int? ?? 0xFF3B9EFF),
+        p1: ChartPoint.fromJson(json['p1'] as Map<String, dynamic>),
+        p2: ChartPoint.fromJson(json['p2'] as Map<String, dynamic>),
+      );
+
+  @override
+  FibExtensionDrawing translate(double dBars, double dPrice) => FibExtensionDrawing(
+        id: id,
+        color: color,
+        p1: p1.translate(dBars, dPrice),
+        p2: p2.translate(dBars, dPrice),
+      );
+
+  @override
+  bool hitTest(Offset point, ChartGeometry geo, {double tolerance = 6}) {
+    if (!geo.hasData) return false;
+    final left = Offset(geo.xForBar(_leftBar), 0);
+    final right = Offset(geo.xForBar(_rightBar), 0);
+    for (final f in levels) {
+      final a = Offset(left.dx, geo.yForPrice(levelPrice(f)));
+      final b = Offset(right.dx, geo.yForPrice(levelPrice(f)));
+      if (distanceToSegment(point, a, b) <= tolerance) return true;
+    }
+    return false;
+  }
+}
+
+class PitchforkDrawing extends ChartDrawing {
+  const PitchforkDrawing({
+    required super.id,
+    required this.p1,
+    required this.p2,
+    required this.p3,
+    super.color,
+  });
+
+  /// The median line runs from [p1] through the midpoint of [p2] and [p3]; the
+  /// two prongs are parallels through [p2] and [p3].
+  final ChartPoint p1;
+  final ChartPoint p2;
+  final ChartPoint p3;
+
+  @override
+  Map<String, dynamic> toJson() => {
+        'type': 'pitchfork',
+        'id': id,
+        'color': color.toARGB32(),
+        'p1': p1.toJson(),
+        'p2': p2.toJson(),
+        'p3': p3.toJson(),
+      };
+
+  factory PitchforkDrawing.fromJson(Map<String, dynamic> json) => PitchforkDrawing(
+        id: json['id'] as int,
+        color: Color(json['color'] as int? ?? 0xFF3B9EFF),
+        p1: ChartPoint.fromJson(json['p1'] as Map<String, dynamic>),
+        p2: ChartPoint.fromJson(json['p2'] as Map<String, dynamic>),
+        p3: ChartPoint.fromJson(json['p3'] as Map<String, dynamic>),
+      );
+
+  @override
+  PitchforkDrawing translate(double dBars, double dPrice) => PitchforkDrawing(
+        id: id,
+        color: color,
+        p1: p1.translate(dBars, dPrice),
+        p2: p2.translate(dBars, dPrice),
+        p3: p3.translate(dBars, dPrice),
+      );
+
+  @override
+  bool hitTest(Offset point, ChartGeometry geo, {double tolerance = 6}) {
+    if (!geo.hasData) return false;
+    final a = Offset(geo.xForBar(p1.bar), geo.yForPrice(p1.price));
+    final b = Offset(geo.xForBar(p2.bar), geo.yForPrice(p2.price));
+    final c = Offset(geo.xForBar(p3.bar), geo.yForPrice(p3.price));
+    final v = (b + c) / 2 - a;
+    if (v.distance < 1) return false;
+    return distanceToLine(point, a, v) <= tolerance ||
+        distanceToLine(point, b, v) <= tolerance ||
+        distanceToLine(point, c, v) <= tolerance;
+  }
+}
+
+class SRZoneDrawing extends ChartDrawing {
+  const SRZoneDrawing({required super.id, required this.p1, required this.p2, super.color});
+
+  /// The zone spans the full chart width between the two anchor prices.
+  final ChartPoint p1;
+  final ChartPoint p2;
+
+  double get top => p1.price >= p2.price ? p1.price : p2.price;
+  double get bottom => p1.price < p2.price ? p1.price : p2.price;
+
+  @override
+  Map<String, dynamic> toJson() => {
+        'type': 'sr',
+        'id': id,
+        'color': color.toARGB32(),
+        'p1': p1.toJson(),
+        'p2': p2.toJson(),
+      };
+
+  factory SRZoneDrawing.fromJson(Map<String, dynamic> json) => SRZoneDrawing(
+        id: json['id'] as int,
+        color: Color(json['color'] as int? ?? 0xFF3B9EFF),
+        p1: ChartPoint.fromJson(json['p1'] as Map<String, dynamic>),
+        p2: ChartPoint.fromJson(json['p2'] as Map<String, dynamic>),
+      );
+
+  @override
+  SRZoneDrawing translate(double dBars, double dPrice) => SRZoneDrawing(
+        id: id,
+        color: color,
+        p1: p1.translate(dBars, dPrice),
+        p2: p2.translate(dBars, dPrice),
+      );
+
+  @override
+  bool hitTest(Offset point, ChartGeometry geo, {double tolerance = 6}) {
+    if (!geo.hasData) return false;
+    final yTop = geo.yForPrice(top);
+    final yBottom = geo.yForPrice(bottom);
+    final inX = point.dx >= -tolerance && point.dx <= geo.chartWidth + tolerance;
+    if (!inX) return false;
+    if (point.dy >= yTop - tolerance && point.dy <= yBottom + tolerance) return true;
+    return (point.dy - yTop).abs() <= tolerance || (point.dy - yBottom).abs() <= tolerance;
+  }
+}
+
 class FibRetracementDrawing extends ChartDrawing {
   const FibRetracementDrawing({required super.id, required this.p1, required this.p2, super.color});
 
@@ -597,6 +802,10 @@ ChartDrawing chartDrawingFromJson(Map<String, dynamic> json) => switch (json['ty
       'channel' => ChannelDrawing.fromJson(json),
       'ellipse' => EllipseDrawing.fromJson(json),
       'text' => TextDrawing.fromJson(json),
+      'fibfan' => FibFanDrawing.fromJson(json),
+      'fibext' => FibExtensionDrawing.fromJson(json),
+      'pitchfork' => PitchforkDrawing.fromJson(json),
+      'sr' => SRZoneDrawing.fromJson(json),
       'fibonacci' => FibRetracementDrawing.fromJson(json),
       _ => throw FormatException('unknown drawing type: ${json['type']}'),
     };

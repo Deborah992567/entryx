@@ -294,6 +294,50 @@ class CandleChartPainter extends CustomPainter {
         final origin = Offset(geo.xForBar(p1.bar), geo.yForPrice(p1.price));
         _drawText(canvas, text, origin - const Offset(0, 13), color, fontSize: 12);
         if (selected) _drawHandles(canvas, geo, [p1]);
+      case models.FibFanDrawing(:final p1, :final p2):
+        final origin = Offset(geo.xForBar(p1.bar), geo.yForPrice(p1.price));
+        for (final f in models.FibFanDrawing.levels) {
+          final price = p1.price - (p1.price - p2.price) * f;
+          final through = Offset(geo.xForBar(p2.bar), geo.yForPrice(price));
+          _drawRay(canvas, geo, origin, through, paint);
+        }
+        if (selected) _drawHandles(canvas, geo, [p1, p2]);
+      case models.FibExtensionDrawing(:final p1, :final p2):
+        final left = geo.xForBar(p1.bar < p2.bar ? p1.bar : p2.bar);
+        final right = geo.xForBar(p1.bar < p2.bar ? p2.bar : p1.bar);
+        for (final f in models.FibExtensionDrawing.levels) {
+          final price = p1.price + (p2.price - p1.price) * f;
+          final y = geo.yForPrice(price);
+          canvas.drawLine(Offset(left, y), Offset(right, y), paint);
+          _drawText(
+              canvas,
+              '${(f * 100).round()}%  ${price.toStringAsFixed(decimals)}',
+              Offset(right + 4, y - 6),
+              color,
+              fontSize: 9.5);
+        }
+        if (selected) _drawHandles(canvas, geo, [p1, p2]);
+      case models.PitchforkDrawing(:final p1, :final p2, :final p3):
+        final a = Offset(geo.xForBar(p1.bar), geo.yForPrice(p1.price));
+        final b = Offset(geo.xForBar(p2.bar), geo.yForPrice(p2.price));
+        final c = Offset(geo.xForBar(p3.bar), geo.yForPrice(p3.price));
+        final v = (b + c) / 2 - a;
+        _drawInfiniteLine(canvas, geo, a, v, paint);
+        _drawInfiniteLine(canvas, geo, b, v, paint);
+        _drawInfiniteLine(canvas, geo, c, v, paint);
+        if (selected) _drawHandles(canvas, geo, [p1, p2, p3]);
+      case models.SRZoneDrawing(:final p1, :final p2):
+        final top = p1.price >= p2.price ? p1.price : p2.price;
+        final bottom = p1.price < p2.price ? p1.price : p2.price;
+        final yTop = geo.yForPrice(top);
+        final yBottom = geo.yForPrice(bottom);
+        final fill = Paint()..color = color.withValues(alpha: 0.12);
+        canvas.drawRect(Rect.fromLTRB(0, yTop, geo.chartWidth, yBottom), fill);
+        canvas.drawLine(Offset(0, yTop), Offset(geo.chartWidth, yTop), paint);
+        canvas.drawLine(Offset(0, yBottom), Offset(geo.chartWidth, yBottom), paint);
+        _drawText(canvas, top.toStringAsFixed(decimals), Offset(geo.chartWidth + 4, yTop - 6),
+            color, fontSize: 9.5);
+        if (selected) _drawHandles(canvas, geo, [p1, p2]);
       case models.FibRetracementDrawing(:final high, :final low):
         final left = geo.xForBar(high.bar < low.bar ? high.bar : low.bar);
         final right = geo.xForBar(high.bar < low.bar ? low.bar : high.bar);
@@ -356,6 +400,18 @@ class CandleChartPainter extends CustomPainter {
     final t1 = tLeft < tRight ? tLeft : tRight;
     final t2 = tLeft < tRight ? tRight : tLeft;
     canvas.drawLine(a + v * t1, a + v * t2, paint);
+  }
+
+  /// Draws the ray from [origin] through [through], extending to the right edge.
+  void _drawRay(Canvas canvas, ChartGeometry geo, Offset origin, Offset through, Paint paint) {
+    final dir = through - origin;
+    if (dir.distance < 0.5) return;
+    if (dir.dx == 0) {
+      canvas.drawLine(origin, Offset(origin.dx, geo.priceBottom), paint);
+      return;
+    }
+    final t = (geo.chartWidth - origin.dx) / dir.dx;
+    canvas.drawLine(origin, origin + dir * math.max(t, 0), paint);
   }
 
   // ------------------------------------------------------------------- crosshair

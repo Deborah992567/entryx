@@ -27,7 +27,7 @@ class _ChartPanelState extends State<ChartPanel> {
   ChartPoint? _pendingStart;
   ChartDrawing? _draft;
   ({ChartDrawing drawing, double bar, double price})? _moveState;
-  ({ChartPoint p1, ChartPoint p2})? _channelBase;
+  ({ChartPoint p1, ChartPoint p2})? _pendingBase;
 
   @override
   Widget build(BuildContext context) {
@@ -46,7 +46,7 @@ class _ChartPanelState extends State<ChartPanel> {
         _DrawingToolbar(
           store: store,
           onToolSelected: (tool) => _onToolSelected(store, tool),
-          channelBasePending: _channelBase != null,
+          basePending: _pendingBase != null,
         ),
         const Divider(height: 1),
         Expanded(
@@ -137,17 +137,7 @@ class _ChartPanelState extends State<ChartPanel> {
 
     final point = ChartPoint(bar, price);
     _pendingStart = point;
-    if (store.tool == DrawingTool.channel) {
-      final base = _channelBase;
-      _draft = ChannelDrawing(
-        id: -1,
-        p1: base?.p1 ?? point,
-        p2: base?.p2 ?? point,
-        p3: point,
-      );
-    } else {
-      _draft = _makeDraft(store.tool, -1, point);
-    }
+    _draft = _makeDraft(store.tool, -1, point);
     setState(() {});
   }
 
@@ -160,20 +150,9 @@ class _ChartPanelState extends State<ChartPanel> {
       store.updateDrawing(move.drawing.translate(dBar, dPrice));
       return;
     }
-    final draft = _draft;
-    if (draft != null) {
+    if (_draft != null) {
       final end = ChartPoint(geo.barAtX(details.localPosition.dx), geo.priceAtY(details.localPosition.dy));
-      if (draft is ChannelDrawing) {
-        final base = _channelBase;
-        _draft = ChannelDrawing(
-          id: -1,
-          p1: draft.p1,
-          p2: base?.p2 ?? end,
-          p3: end,
-        );
-      } else {
-        _draft = _makeDraft(store.tool, -1, _pendingStart ?? end, end);
-      }
+      _draft = _makeDraft(store.tool, -1, _pendingStart ?? end, end);
       setState(() {});
       return;
     }
@@ -195,8 +174,8 @@ class _ChartPanelState extends State<ChartPanel> {
     if (draft == null) return;
     setState(() {});
 
-    if (draft is ChannelDrawing) {
-      _finishChannelDrag(store, geo, draft);
+    if (draft is ChannelDrawing || draft is PitchforkDrawing) {
+      _finishMultiPointDrag(store, geo, draft);
       return;
     }
 
@@ -233,10 +212,27 @@ class _ChartPanelState extends State<ChartPanel> {
               id: store.nextDrawingId, p1: start, p2: draft.p2, color: draft.color));
         }
       case ChannelDrawing():
-        break; // handled in _finishChannelDrag
+        break; // handled in _finishMultiPointDrag
       case EllipseDrawing():
         if (_dragDistance(geo, start!, draft.p2) >= 4) {
           store.addDrawing(EllipseDrawing(
+              id: store.nextDrawingId, p1: start, p2: draft.p2, color: draft.color));
+        }
+      case FibFanDrawing():
+        if (_dragDistance(geo, start!, draft.p2) >= 4) {
+          store.addDrawing(FibFanDrawing(
+              id: store.nextDrawingId, p1: start, p2: draft.p2, color: draft.color));
+        }
+      case FibExtensionDrawing():
+        if (_dragDistance(geo, start!, draft.p2) >= 4) {
+          store.addDrawing(FibExtensionDrawing(
+              id: store.nextDrawingId, p1: start, p2: draft.p2, color: draft.color));
+        }
+      case PitchforkDrawing():
+        break; // handled in _finishMultiPointDrag
+      case SRZoneDrawing():
+        if (_dragDistance(geo, start!, draft.p2) >= 4) {
+          store.addDrawing(SRZoneDrawing(
               id: store.nextDrawingId, p1: start, p2: draft.p2, color: draft.color));
         }
       case TextDrawing():
@@ -255,29 +251,45 @@ class _ChartPanelState extends State<ChartPanel> {
   }
 
   void _onToolSelected(ChartStore store, DrawingTool tool) {
-    _channelBase = null;
+    _pendingBase = null;
     _moveState = null;
     _draft = null;
     store.setTool(tool);
   }
 
-  /// Channels are drawn in two drags: the first sets the guide line, the second
-  /// sets the perpendicular offset of the parallel edge.
-  void _finishChannelDrag(ChartStore store, ChartGeometry geo, ChannelDrawing draft) {
-    final base = _channelBase;
+  /// Multi-point tools (channel, pitchfork) are drawn in two drags: the first
+  /// sets the two base anchors, the second sets the final anchor.
+  void _finishMultiPointDrag(ChartStore store, ChartGeometry geo, Object draft) {
+    final base = _pendingBase;
     if (base == null) {
-      if (_dragDistance(geo, draft.p1, draft.p2) >= 4) {
-        _channelBase = (p1: draft.p1, p2: draft.p2);
+      final p1 = draft is ChannelDrawing ? draft.p1 : (draft as PitchforkDrawing).p1;
+      final p2 = draft is ChannelDrawing ? draft.p2 : (draft as PitchforkDrawing).p2;
+      if (_dragDistance(geo, p1, p2) >= 4) {
+        _pendingBase = (p1: p1, p2: p2);
       }
       return;
     }
-    final a = Offset(geo.xForBar(draft.p1.bar), geo.yForPrice(draft.p1.price));
-    final b = Offset(geo.xForBar(draft.p2.bar), geo.yForPrice(draft.p2.price));
-    final c = Offset(geo.xForBar(draft.p3.bar), geo.yForPrice(draft.p3.price));
-    if (distanceToLine(c, a, b - a) < 4) return; // too thin to be useful
-    store.addDrawing(ChannelDrawing(
-        id: store.nextDrawingId, p1: draft.p1, p2: draft.p2, p3: draft.p3, color: draft.color));
-    _channelBase = null;
+    if (draft is ChannelDrawing) {
+      final a = Offset(geo.xForBar(draft.p1.bar), geo.yForPrice(draft.p1.price));
+      final b = Offset(geo.xForBar(draft.p2.bar), geo.yForPrice(draft.p2.price));
+      final c = Offset(geo.xForBar(draft.p3.bar), geo.yForPrice(draft.p3.price));
+      if (distanceToLine(c, a, b - a) < 4) return; // too thin to be useful
+      store.addDrawing(ChannelDrawing(
+          id: store.nextDrawingId,
+          p1: draft.p1,
+          p2: draft.p2,
+          p3: draft.p3,
+          color: draft.color));
+    } else if (draft is PitchforkDrawing) {
+      if (_dragDistance(geo, draft.p2, draft.p3) < 4) return;
+      store.addDrawing(PitchforkDrawing(
+          id: store.nextDrawingId,
+          p1: draft.p1,
+          p2: draft.p2,
+          p3: draft.p3,
+          color: draft.color));
+    }
+    _pendingBase = null;
   }
 
   Future<void> _placeText(ChartStore store, ChartGeometry geo, Offset pos) async {
@@ -318,9 +330,27 @@ class _ChartPanelState extends State<ChartPanel> {
       case DrawingTool.arrow:
         return ArrowDrawing(id: id, p1: a, p2: p2);
       case DrawingTool.channel:
-        return ChannelDrawing(id: id, p1: a, p2: p2, p3: p2);
+        final channelBase = _pendingBase;
+        return ChannelDrawing(
+            id: id,
+            p1: channelBase?.p1 ?? a,
+            p2: channelBase?.p2 ?? p2,
+            p3: p2);
       case DrawingTool.ellipse:
         return EllipseDrawing(id: id, p1: a, p2: p2);
+      case DrawingTool.fibFan:
+        return FibFanDrawing(id: id, p1: a, p2: p2);
+      case DrawingTool.fibExtension:
+        return FibExtensionDrawing(id: id, p1: a, p2: p2);
+      case DrawingTool.pitchfork:
+        final forkBase = _pendingBase;
+        return PitchforkDrawing(
+            id: id,
+            p1: forkBase?.p1 ?? a,
+            p2: forkBase?.p2 ?? p2,
+            p3: p2);
+      case DrawingTool.sr:
+        return SRZoneDrawing(id: id, p1: a, p2: p2);
       case DrawingTool.text:
         throw StateError('text tool has no draft');
       case DrawingTool.select:
@@ -402,11 +432,11 @@ class _Toolbar extends StatelessWidget {
 
 class _DrawingToolbar extends StatelessWidget {
   const _DrawingToolbar(
-      {required this.store, required this.onToolSelected, this.channelBasePending = false});
+      {required this.store, required this.onToolSelected, this.basePending = false});
 
   final ChartStore store;
   final ValueChanged<DrawingTool> onToolSelected;
-  final bool channelBasePending;
+  final bool basePending;
 
   static const Map<DrawingTool, IconData> icons = {
     DrawingTool.select: Icons.ads_click,
@@ -420,6 +450,10 @@ class _DrawingToolbar extends StatelessWidget {
     DrawingTool.channel: Icons.swap_calls,
     DrawingTool.ellipse: Icons.circle_outlined,
     DrawingTool.text: Icons.text_fields,
+    DrawingTool.fibFan: Icons.waves,
+    DrawingTool.fibExtension: Icons.trending_up,
+    DrawingTool.pitchfork: Icons.call_split,
+    DrawingTool.sr: Icons.straighten,
   };
 
   @override
@@ -469,11 +503,18 @@ class _DrawingToolbar extends StatelessWidget {
             constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
           ),
           const Spacer(),
-          if (channelBasePending)
-            const Text('channel base set — drag to set width',
-                style: TextStyle(fontSize: 10, color: EntryXColors.warn))
+          if (basePending)
+            Text(
+              store.tool == DrawingTool.pitchfork
+                  ? 'pitchfork prongs set — drag to set the second prong'
+                  : 'channel base set — drag to set width',
+              style: const TextStyle(fontSize: 10, color: EntryXColors.warn),
+            )
           else if (store.tool == DrawingTool.channel)
             const Text('channel — drag a guide line, then set its width',
+                style: TextStyle(fontSize: 10, color: EntryXColors.textDim))
+          else if (store.tool == DrawingTool.pitchfork)
+            const Text('pitchfork — drag the origin line, then the prongs',
                 style: TextStyle(fontSize: 10, color: EntryXColors.textDim))
           else if (store.tool == DrawingTool.text)
             const Text('text — tap on the chart to add a label',
