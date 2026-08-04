@@ -272,3 +272,111 @@ def test_pending_limit_fills_via_quote_tick() -> None:
     assert events[0][0] == "order.filled"
     assert events[0][1].id == order.id
     assert len(broker.open_positions()) == 1
+
+
+# -- Line 2: position management ---------------------------------------------------
+
+
+def test_partial_close_reduces_volume() -> None:
+    broker = PaperBroker(FakeProvider(1.09))
+    broker.place_order(OrderRequest(symbol="EURUSD", side="buy", type="market", volume=2.0))
+    position = broker.open_positions()[0]
+    trade = broker.close_position(position.id, volume=0.5)
+    assert trade.volume == pytest.approx(0.5)
+    remaining = broker.open_positions()
+    assert len(remaining) == 1
+    assert remaining[0].id == position.id
+    assert remaining[0].volume == pytest.approx(1.5)
+
+    trade2 = broker.close_position(position.id)
+    assert trade2.volume == pytest.approx(1.5)
+    assert broker.open_positions() == []
+    assert len(broker.closed_trades()) == 2
+
+
+def test_partial_close_validates_volume() -> None:
+    broker = PaperBroker(FakeProvider(1.09))
+    broker.place_order(OrderRequest(symbol="EURUSD", side="buy", type="market", volume=1.0))
+    position = broker.open_positions()[0]
+    with pytest.raises(InvalidOrderError):
+        broker.close_position(position.id, volume=2.0)
+    with pytest.raises(InvalidOrderError):
+        broker.close_position(position.id, volume=0)
+
+
+def test_modify_position_sl_tp_and_clear() -> None:
+    broker = PaperBroker(FakeProvider(1.09))
+    broker.place_order(OrderRequest(symbol="EURUSD", side="buy", type="market", volume=1))
+    position = broker.open_positions()[0]
+    updated = broker.modify_position(position.id, sl=1.08, tp=1.12)
+    assert updated.sl == pytest.approx(1.08)
+    assert updated.tp == pytest.approx(1.12)
+    cleared = broker.modify_position(position.id, tp=None)
+    assert cleared.tp is None
+    assert cleared.sl == pytest.approx(1.08)
+
+
+def test_modify_position_validates_against_current_price() -> None:
+    broker = PaperBroker(FakeProvider(1.09))
+    broker.place_order(OrderRequest(symbol="EURUSD", side="buy", type="market", volume=1))
+    position = broker.open_positions()[0]
+    with pytest.raises(InvalidOrderError):
+        broker.modify_position(position.id, sl=1.20)  # buy SL must stay below bid
+    with pytest.raises(InvalidOrderError):
+        broker.modify_position(position.id, trail=0)
+    with pytest.raises(UnknownRefError):
+        broker.modify_position("p-nope", sl=1.0)
+
+
+def test_trailing_stop_ratchets_sl() -> None:
+    provider = FakeProvider(1.09)
+    broker = PaperBroker(provider)
+    broker.place_order(OrderRequest(symbol="EURUSD", side="buy", type="market", volume=1))
+    position = broker.open_positions()[0]
+    broker.modify_position(position.id, trail=0.01)
+    broker.on_quote("EURUSD")
+    assert broker.open_positions()[0].sl == pytest.approx(1.08)  # bid - trail
+
+    provider.set_price(1.10)
+    broker.on_quote("EURUSD")
+    assert broker.open_positions()[0].sl == pytest.approx(1.09)
+
+    provider.set_price(1.095)  # pullback, SL must not move back
+    broker.on_quote("EURUSD")
+    assert broker.open_positions()[0].sl == pytest.approx(1.09)
+
+    provider.set_price(1.088)  # falls through trailing SL -> closed
+    events = broker.on_quote("EURUSD")
+    assert events[0][0] == "position.closed"
+    assert broker.open_positions() == []
+
+
+def test_sl_hit_closes_position_via_quote() -> None:
+    provider = FakeProvider(1.09)
+    broker = PaperBroker(provider)
+    broker.place_order(
+        OrderRequest(symbol="EURUSD", side="buy", type="market", volume=1, sl=1.07, tp=1.11)
+    )
+    assert broker.open_positions()
+    provider.set_price(1.068)
+    events = broker.on_quote("EURUSD")
+    assert events[0][0] == "position.closed"
+    trade = events[0][1]
+    assert trade.close_price == pytest.approx(1.07)
+    assert trade.net_pnl < 0
+    assert broker.open_positions() == []
+    assert len(broker.closed_trades()) == 1
+
+
+def test_tp_hit_closes_position_via_quote() -> None:
+    provider = FakeProvider(1.09)
+    broker = PaperBroker(provider)
+    broker.place_order(
+        OrderRequest(symbol="EURUSD", side="buy", type="market", volume=1, sl=1.07, tp=1.11)
+    )
+    provider.set_price(1.115)
+    events = broker.on_quote("EURUSD")
+    assert events[0][0] == "position.closed"
+    assert events[0][1].close_price == pytest.approx(1.11)
+    assert events[0][1].net_pnl > 0
+    assert broker.open_positions() == []

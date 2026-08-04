@@ -95,6 +95,7 @@ def to_position_out(position: BrokerPosition, floating_pnl: float = 0.0) -> dict
         "tp": position.tp,
         "opened_at": position.opened_at,
         "commission": position.commission,
+        "trail": position.trail,
         "floating_pnl": floating_pnl,
     }
 
@@ -142,30 +143,43 @@ async def cancel_order(user_id: int, order_id: str) -> BrokerOrder:
     return order
 
 
-async def close_position(user_id: int, position_id: str) -> ClosedTrade:
+async def close_position(user_id: int, position_id: str, volume: float | None = None) -> ClosedTrade:
     broker = get_broker(user_id)
-    trade = broker.close_position(position_id)
+    trade = broker.close_position(position_id, volume=volume)
     await manager.broadcast("positions", "position.closed", to_trade_out(trade))
     await manager.broadcast("history", "trade.closed", to_trade_out(trade))
     await manager.broadcast(f"account.{user_id}", "account.updated", account_summary(user_id))
     return trade
 
 
-async def process_market(symbol: str) -> None:
-    """Evaluate pending orders against a fresh quote for every account.
+async def modify_position(user_id: int, position_id: str, **changes: object) -> BrokerPosition:
+    broker = get_broker(user_id)
+    position = broker.modify_position(position_id, **changes)
+    quote = market_data.quote(position.symbol)
+    pnl = broker.floating_pnl(position, quote)
+    await manager.broadcast("positions", "position.updated", to_position_out(position, pnl))
+    return position
 
-    Called by the market tick loop so pending orders fill/expire in near
-    real-time and the resulting changes are broadcast.
+
+async def process_market(symbol: str) -> None:
+    """Evaluate pending orders and position protections against a fresh quote.
+
+    Called by the market tick loop so pending orders fill/expire, SL/TP/trailing
+    stops fire, and the resulting changes are broadcast in near real-time.
     """
     for user_id, broker in active_brokers():
         events = broker.on_quote(symbol)
-        for kind, order in events:
+        for kind, payload in events:
             if kind == "order.filled":
-                await manager.broadcast("orders", "order.filled", to_order_out(order))
-                position = broker.position(order.id.replace("o-", "p-"))
+                await manager.broadcast("orders", "order.filled", to_order_out(payload))
+                position = broker.position(payload.id.replace("o-", "p-"))
                 quote = market_data.quote(position.symbol)
                 pnl = broker.floating_pnl(position, quote)
                 await manager.broadcast("positions", "position.opened", to_position_out(position, pnl))
                 await manager.broadcast(f"account.{user_id}", "account.updated", account_summary(user_id))
             elif kind == "order.expired":
-                await manager.broadcast("orders", "order.expired", to_order_out(order))
+                await manager.broadcast("orders", "order.expired", to_order_out(payload))
+            elif kind == "position.closed":
+                await manager.broadcast("positions", "position.closed", to_trade_out(payload))
+                await manager.broadcast("history", "trade.closed", to_trade_out(payload))
+                await manager.broadcast(f"account.{user_id}", "account.updated", account_summary(user_id))

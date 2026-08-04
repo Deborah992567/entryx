@@ -8,7 +8,15 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user
 from app.db.models.user import User
 from app.db.session import get_db
-from app.schemas.trading import AccountOut, OrderCreate, OrderOut, PositionOut, TradeOut
+from app.schemas.trading import (
+    AccountOut,
+    OrderCreate,
+    OrderOut,
+    PositionClose,
+    PositionModify,
+    PositionOut,
+    TradeOut,
+)
 from app.services import trading_service
 from app.services.broker import BrokerError, OrderRequest
 
@@ -78,6 +86,35 @@ async def close_position(
     try:
         trade = await trading_service.close_position(user.id, position_id)
         return trading_service.to_trade_out(trade)
+    except BrokerError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+@router.post("/positions/{position_id}/close", response_model=TradeOut)
+async def close_position_partial(
+    position_id: str,
+    body: PositionClose,
+    user: User = Depends(get_current_user),
+    _db: Session = Depends(get_db),
+) -> dict:
+    try:
+        trade = await trading_service.close_position(user.id, position_id, volume=body.volume)
+        return trading_service.to_trade_out(trade)
+    except BrokerError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+@router.patch("/positions/{position_id}", response_model=PositionOut)
+async def modify_position(
+    position_id: str,
+    body: PositionModify,
+    user: User = Depends(get_current_user),
+    _db: Session = Depends(get_db),
+) -> dict:
+    try:
+        changes = {field: getattr(body, field) for field in body.model_fields_set}
+        position = await trading_service.modify_position(user.id, position_id, **changes)
+        return trading_service.to_position_out(position)
     except BrokerError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 

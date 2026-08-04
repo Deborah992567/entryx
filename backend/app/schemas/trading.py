@@ -58,7 +58,18 @@ class PositionOut(BaseModel):
     tp: float | None
     opened_at: datetime
     commission: float
+    trail: float | None = None
     floating_pnl: float = 0.0
+
+
+class PositionModify(BaseModel):
+    sl: float | None = None
+    tp: float | None = None
+    trail: float | None = None
+
+
+class PositionClose(BaseModel):
+    volume: float | None = Field(default=None, gt=0)
 
 
 class TradeOut(BaseModel):

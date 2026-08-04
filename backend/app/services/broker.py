@@ -80,6 +80,8 @@ class BrokerPosition:
     tp: float | None
     opened_at: datetime
     commission: float
+    trail: float | None = None  # trailing-stop distance in price units
+    trail_extreme: float | None = None  # extreme price seen since trailing started
 
 
 @dataclass(frozen=True)
@@ -94,6 +96,9 @@ class ClosedTrade:
     net_pnl: float
     commission: float
     closed_at: datetime
+
+
+_UNSET = object()
 
 
 @dataclass
@@ -241,16 +246,16 @@ class PaperBroker(BrokerAdapter):
         self._orders[order_id] = cancelled
         return cancelled
 
-    def on_quote(self, symbol: str, *, now: datetime | None = None) -> list[tuple[str, BrokerOrder]]:
-        """Process pending orders against the latest quote for ``symbol``.
+    def on_quote(self, symbol: str, *, now: datetime | None = None) -> list[tuple[str, object]]:
+        """Process pending orders and position protections against a fresh quote.
 
         Expired pending orders transition to ``expired``; crossed limit/stop/
-        stop-limit orders fill. Returns ``(event, order)`` pairs the caller can
-        broadcast on the wire.
+        stop-limit orders fill. Trailing stops ratchet, and SL/TP hits close
+        positions. Returns ``(event, payload)`` pairs the caller can broadcast.
         """
         quote = self._provider.quote(symbol)
         now = now or datetime.now(UTC)
-        events: list[tuple[str, BrokerOrder]] = []
+        events: list[tuple[str, object]] = []
         for oid in list(self._orders):
             order = self._orders[oid]
             if order.symbol != symbol or order.state != "pending":
@@ -263,11 +268,29 @@ class PaperBroker(BrokerAdapter):
             filled = self._maybe_fill(order, quote)
             if filled is not None:
                 events.append(("order.filled", filled))
+
+        for pid in list(self._positions):
+            position = self._positions[pid]
+            if position.symbol != symbol:
+                continue
+            updated = self._apply_trailing(position, quote)
+            if updated is not position:
+                self._positions[pid] = updated
+                position = updated
+            if position.sl is not None:
+                hit = quote.bid <= position.sl if position.side == "buy" else quote.ask >= position.sl
+                if hit:
+                    events.append(("position.closed", self.close_position(position.id, price=position.sl)))
+                    continue
+            if position.tp is not None:
+                hit = quote.bid >= position.tp if position.side == "buy" else quote.ask <= position.tp
+                if hit:
+                    events.append(("position.closed", self.close_position(position.id, price=position.tp)))
         return events
 
     # -- positions ------------------------------------------------------------
 
-    def close_position(self, position_id: str, price: float | None = None) -> ClosedTrade:
+    def close_position(self, position_id: str, price: float | None = None, volume: float | None = None) -> ClosedTrade:
         position = self._positions.get(position_id)
         if position is None:
             raise UnknownRefError(f"unknown position: {position_id}")
@@ -275,26 +298,83 @@ class PaperBroker(BrokerAdapter):
         close_price = price if price is not None else (quote.bid if position.side == "buy" else quote.ask)
         info = self._provider.symbol_info(position.symbol)
         close_price = round(close_price, info.digits)
-        gross = self.floating_pnl(position, quote)
-        notional = close_price * info.contract_size * position.volume
-        commission = round(notional * COMMISSION_RATE, 2)
-        net = round(gross - commission - position.commission, 2)
+        volume = round(position.volume if volume is None else volume, 4)
+        if volume <= 0:
+            raise InvalidOrderError("close volume must be positive")
+        if volume > position.volume:
+            raise InvalidOrderError("cannot close more than the position volume")
+        direction = 1.0 if position.side == "buy" else -1.0
+        gross = (close_price - position.open_price) * direction * info.contract_size * volume
+        close_notional = close_price * info.contract_size * volume
+        close_commission = round(close_notional * COMMISSION_RATE, 2)
+        open_commission = round(position.commission * volume / position.volume, 2)
+        net = round(gross - close_commission - open_commission, 2)
         trade = ClosedTrade(
             id=_new_id("t"),
             symbol=position.symbol,
             side=position.side,
-            volume=position.volume,
+            volume=volume,
             open_price=position.open_price,
             close_price=close_price,
             gross_pnl=round(gross, 2),
             net_pnl=net,
-            commission=commission,
+            commission=close_commission,
             closed_at=datetime.now(UTC),
         )
         self._account.balance = round(self._account.balance + net, 2)
-        del self._positions[position_id]
+        if volume >= position.volume:
+            del self._positions[position_id]
+        else:
+            self._positions[position_id] = _replace_position(position, volume=round(position.volume - volume, 4))
         self._closed.append(trade)
         return trade
+
+    def modify_position(
+        self,
+        position_id: str,
+        *,
+        sl: object = _UNSET,
+        tp: object = _UNSET,
+        trail: object = _UNSET,
+    ) -> BrokerPosition:
+        """Update a position's SL/TP and trailing-stop distance.
+
+        Passing a value replaces it; passing ``None`` clears the protection;
+        omitting the argument leaves it unchanged.
+        """
+        position = self._positions.get(position_id)
+        if position is None:
+            raise UnknownRefError(f"unknown position: {position_id}")
+        quote = self._provider.quote(position.symbol)
+        new_sl = position.sl if sl is _UNSET else sl
+        new_tp = position.tp if tp is _UNSET else tp
+        new_trail = position.trail if trail is _UNSET else trail
+        if new_sl is not None:
+            if position.side == "buy" and new_sl >= quote.bid:
+                raise InvalidOrderError("buy stop loss must be below the current bid")
+            if position.side == "sell" and new_sl <= quote.ask:
+                raise InvalidOrderError("sell stop loss must be above the current ask")
+        if new_tp is not None:
+            if position.side == "buy" and new_tp <= quote.bid:
+                raise InvalidOrderError("buy take profit must be above the current bid")
+            if position.side == "sell" and new_tp >= quote.ask:
+                raise InvalidOrderError("sell take profit must be below the current ask")
+        if new_trail is not None:
+            if new_trail <= 0:
+                raise InvalidOrderError("trail must be a positive distance")
+        if trail is not _UNSET and new_trail is not None:
+            extreme = quote.bid if position.side == "buy" else quote.ask
+        else:
+            extreme = position.trail_extreme
+        updated = _replace_position(
+            position,
+            sl=new_sl,
+            tp=new_tp,
+            trail=new_trail,
+            trail_extreme=extreme,
+        )
+        self._positions[position_id] = updated
+        return updated
 
     # -- queries --------------------------------------------------------------
 
@@ -345,6 +425,25 @@ class PaperBroker(BrokerAdapter):
         return round(self._account.balance + self.floating_pnl_total(), 2)
 
     # -- internals ------------------------------------------------------------
+
+    def _apply_trailing(self, position: BrokerPosition, quote: Quote) -> BrokerPosition:
+        """Ratchet a trailing stop to lock in profit without moving it back."""
+        trail = position.trail
+        if trail is None:
+            return position
+        info = self._provider.symbol_info(position.symbol)
+        trail = round(trail, info.digits)
+        if position.side == "buy":
+            extreme = max(position.trail_extreme or position.open_price, quote.bid)
+            trail_sl = round(extreme - trail, info.digits)
+            new_sl = trail_sl if position.sl is None else max(position.sl, trail_sl)
+        else:
+            extreme = min(position.trail_extreme or position.open_price, quote.ask)
+            trail_sl = round(extreme + trail, info.digits)
+            new_sl = trail_sl if position.sl is None else min(position.sl, trail_sl)
+        if new_sl != position.sl or extreme != position.trail_extreme:
+            return _replace_position(position, sl=new_sl, trail_extreme=extreme)
+        return position
 
     def _maybe_fill(self, order: BrokerOrder, quote: Quote) -> BrokerOrder | None:
         """Fill ``order`` against ``quote`` if its trigger conditions are met."""
@@ -450,6 +549,22 @@ def _replace(order: BrokerOrder, **kwargs) -> BrokerOrder:
         limit_price=kwargs.get("limit_price", order.limit_price),
         expiry=kwargs.get("expiry", order.expiry),
         triggered=kwargs.get("triggered", order.triggered),
+    )
+
+
+def _replace_position(position: BrokerPosition, **kwargs) -> BrokerPosition:
+    return BrokerPosition(
+        id=kwargs.get("id", position.id),
+        symbol=kwargs.get("symbol", position.symbol),
+        side=kwargs.get("side", position.side),
+        volume=kwargs.get("volume", position.volume),
+        open_price=kwargs.get("open_price", position.open_price),
+        sl=kwargs.get("sl", position.sl),
+        tp=kwargs.get("tp", position.tp),
+        opened_at=kwargs.get("opened_at", position.opened_at),
+        commission=kwargs.get("commission", position.commission),
+        trail=kwargs.get("trail", position.trail),
+        trail_extreme=kwargs.get("trail_extreme", position.trail_extreme),
     )
 
 
