@@ -44,6 +44,35 @@ void main() {
     expect(sum, closeTo(1.0, 1e-9));
   });
 
+  test('splitPanel adds a second panel of the given type', () {
+    final layout = DockLayout.defaultLayout();
+    final split = layout.splitPanel('panel.chart',
+        orientation: DockOrientation.horizontal, type: PanelType.chart);
+    expect(split.panels, hasLength(5));
+    expect(split.panels.where((p) => p.type == PanelType.chart), hasLength(2));
+    expect(split.panel('panel.chart'), isNotNull);
+  });
+
+  test('splitPanel on the root panel wraps it in a split', () {
+    const single = PanelNode(id: 'solo', type: PanelType.chart);
+    final layout = DockLayout(single);
+    final split = layout.splitPanel('solo',
+        orientation: DockOrientation.vertical, type: PanelType.journal);
+    expect(split.panels, hasLength(2));
+    expect(split.panel('solo'), isNotNull);
+    expect(split.panels.any((p) => p.type == PanelType.journal), isTrue);
+  });
+
+  test('splitPanel idempotently generates unique panel ids', () {
+    final layout = DockLayout.defaultLayout();
+    final a = layout.splitPanel('panel.chart',
+        orientation: DockOrientation.horizontal, type: PanelType.chart);
+    final b = a.splitPanel('panel.chart',
+        orientation: DockOrientation.horizontal, type: PanelType.chart);
+    final ids = b.panels.map((p) => p.id).toSet();
+    expect(ids.length, b.panels.length);
+  });
+
   testWidgets('app boots to the auth screen when no session exists', (tester) async {
     await tester.pumpWidget(const EntryXApp());
     expect(find.byType(AuthScreen), findsNothing);

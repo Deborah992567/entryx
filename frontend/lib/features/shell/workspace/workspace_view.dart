@@ -31,6 +31,7 @@ class WorkspaceView extends StatelessWidget {
         layout: store.layout,
         onCollapse: () => store.toggleCollapse(node.id),
         onSwap: (type) => _swapTo(node.id, type),
+        onSplit: (orientation) => store.splitPanel(node.id, orientation),
       );
     }
     final split = node as SplitNode;
@@ -126,7 +127,7 @@ class _DividerHandleState extends State<_DividerHandle> {
   }
 }
 
-/// Panel chrome: title bar with collapse + panel-swap menu.
+/// Panel chrome: title bar with collapse, split, and panel-swap menu.
 class PanelFrame extends StatelessWidget {
   const PanelFrame({
     super.key,
@@ -134,12 +135,14 @@ class PanelFrame extends StatelessWidget {
     required this.layout,
     required this.onCollapse,
     required this.onSwap,
+    required this.onSplit,
   });
 
   final PanelNode panel;
   final DockLayout layout;
   final VoidCallback onCollapse;
   final void Function(PanelType) onSwap;
+  final void Function(DockOrientation) onSplit;
 
   @override
   Widget build(BuildContext context) {
@@ -185,26 +188,61 @@ class PanelFrame extends StatelessWidget {
                   tooltip: 'Collapse',
                   onTap: onCollapse,
                 ),
-                PopupMenuButton<PanelType>(
+                PopupMenuButton<_PanelCommand>(
                   tooltip: 'Change panel',
                   icon: const Icon(Icons.more_vert, size: 14, color: EntryXColors.textDim),
                   padding: EdgeInsets.zero,
                   itemBuilder: (_) => [
+                    const PopupMenuItem(
+                      value: _SplitHorizontal(),
+                      child: Text('Split right', style: TextStyle(fontSize: 12)),
+                    ),
+                    const PopupMenuItem(
+                      value: _SplitVertical(),
+                      child: Text('Split below', style: TextStyle(fontSize: 12)),
+                    ),
+                    const PopupMenuDivider(),
                     for (final type in PanelType.values)
                       if (type != panel.type)
-                        PopupMenuItem(value: type, child: Text(type.title)),
+                        PopupMenuItem(
+                          value: _SwapPanel(type),
+                          child: Text(type.title, style: const TextStyle(fontSize: 12)),
+                        ),
                   ],
-                  onSelected: onSwap,
+                  onSelected: (command) => switch (command) {
+                    _SplitHorizontal() => onSplit(DockOrientation.horizontal),
+                    _SplitVertical() => onSplit(DockOrientation.vertical),
+                    _SwapPanel(:final type) => onSwap(type),
+                  },
                 ),
               ],
             ),
           ),
           const Divider(height: 1),
-          Expanded(child: buildPanel(panel.type)),
+          Expanded(child: buildPanel(panel.type, panelId: panel.id)),
         ],
       ),
     );
   }
+}
+
+/// Popup-menu command: split the current panel or swap it to another type.
+sealed class _PanelCommand {
+  const _PanelCommand();
+}
+
+class _SplitHorizontal extends _PanelCommand {
+  const _SplitHorizontal();
+}
+
+class _SplitVertical extends _PanelCommand {
+  const _SplitVertical();
+}
+
+class _SwapPanel extends _PanelCommand {
+  const _SwapPanel(this.type);
+
+  final PanelType type;
 }
 
 class _IconAction extends StatelessWidget {

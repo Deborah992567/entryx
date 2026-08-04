@@ -71,8 +71,12 @@ class DockLayout {
   DockLayout(this.root);
 
   static const minFlex = 0.04;
+  static int _idCounter = 0;
 
   final DockNode root;
+
+  static String _freshId(String prefix) => '$prefix.${_idCounter++}';
+  static String _freshPanelId(String sourceId) => 'panel.$sourceId.${_idCounter++}';
 
   PanelNode? panel(String id) => _findPanel(root, id);
 
@@ -292,6 +296,41 @@ class DockLayout {
       if (child.node is! PanelNode) return node;
       final newChildren = List<DockChild>.of(node.children);
       newChildren[childIndex] = DockChild(PanelNode(id: child.node.id, type: type), child.flex);
+      return SplitNode(id: node.id, orientation: node.orientation, children: newChildren);
+    }));
+  }
+
+  /// Split [panelId] into two panels stacked along [orientation]. The original
+  /// panel keeps its id; a fresh panel of [type] is added next to it.
+  DockLayout splitPanel(String panelId, {required DockOrientation orientation, required PanelType type}) {
+    if (root is PanelNode && root.id == panelId) {
+      final split = SplitNode(
+        id: _freshId('split.$panelId'),
+        orientation: orientation,
+        children: [
+          DockChild(root, 0.5),
+          DockChild(PanelNode(id: _freshPanelId(panelId), type: type), 0.5),
+        ],
+      );
+      return DockLayout(split);
+    }
+    final path = pathToPanel(panelId);
+    if (path.isEmpty) return this;
+    final (child, parent) = path.first;
+    final index = parent.children.indexOf(child);
+    if (index < 0) return this;
+    final inner = SplitNode(
+      id: _freshId('split.$panelId'),
+      orientation: orientation,
+      children: [
+        DockChild(child.node, 0.5),
+        DockChild(PanelNode(id: _freshPanelId(panelId), type: type), 0.5),
+      ],
+    );
+    return DockLayout(_copyWith(root, (node) {
+      if (node is! SplitNode || node.id != parent.id) return node;
+      final newChildren = List<DockChild>.of(node.children);
+      newChildren[index] = DockChild(inner, child.flex);
       return SplitNode(id: node.id, orientation: node.orientation, children: newChildren);
     }));
   }

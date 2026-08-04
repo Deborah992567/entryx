@@ -36,6 +36,11 @@ class WorkspaceStore extends ChangeNotifier {
     _apply(_layout.swapPanel(splitId, childIndex, type));
   }
 
+  void splitPanel(String panelId, DockOrientation orientation) {
+    final type = _layout.panel(panelId)?.type ?? PanelType.chart;
+    _apply(_layout.splitPanel(panelId, orientation: orientation, type: type));
+  }
+
   void _apply(DockLayout next) {
     if (next.toJson().toString() == _layout.toJson().toString()) return;
     _layout = next;

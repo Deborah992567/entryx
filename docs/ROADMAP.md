@@ -32,7 +32,7 @@ Legend: `[x]` done · `[~]` in progress · `[ ]` planned
 - [x] Canvas chart engine: candlesticks, volume, timeframes (M1…MN1), zoom/pan/crosshair
 - [x] Indicator engine (common interface): SMA, EMA, WMA, VWAP, RSI, MACD, Stochastic,
   ATR, ADX, CCI, ROC, Momentum, Bollinger, Ichimoku, PSAR, OBV, volume
-- [~] Price scale, time scale, auto-scroll, multiple charts, split views, synced charts
+- [x] Price scale, time scale, auto-scroll, multiple charts, split views, synced charts
 - [x] Drawing tools: trendline, ray, h/v lines, rectangle, Fibonacci retracement/extension/
   fan, arrow, channel, ellipse, text label, pitchfork, S/R zones — movable/editable/
   persistent per chart (client + backend persistence)

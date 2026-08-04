@@ -9,10 +9,10 @@ import 'chart_panel.dart';
 import 'market_watch_panel.dart';
 import 'trading_terminal_panel.dart';
 
-Widget buildPanel(PanelType type) {
+Widget buildPanel(PanelType type, {required String panelId}) {
   return switch (type) {
     PanelType.marketWatch => const MarketWatchPanel(),
-    PanelType.chart => const ChartPanel(),
+    PanelType.chart => ChartPanel(storeKey: panelId),
     PanelType.aiCopilot => const AiCopilotPanel(),
     PanelType.terminal => const TradingTerminalPanel(),
     PanelType.journal => _NotBuiltPanel(title: 'Journal'),

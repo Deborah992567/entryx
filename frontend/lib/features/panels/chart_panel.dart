@@ -14,10 +14,14 @@ import '../chart/candle_painter.dart';
 import '../chart/chart_geometry.dart';
 import '../chart/chart_models.dart';
 import '../chart/chart_store.dart';
+import '../chart/chart_store_registry.dart';
 import '../market/market_watch_store.dart';
 
 class ChartPanel extends StatefulWidget {
-  const ChartPanel({super.key});
+  const ChartPanel({super.key, required this.storeKey});
+
+  /// Dock panel id — the key under which this chart's store lives.
+  final String storeKey;
 
   @override
   State<ChartPanel> createState() => _ChartPanelState();
@@ -31,8 +35,15 @@ class _ChartPanelState extends State<ChartPanel> {
 
   @override
   Widget build(BuildContext context) {
-    final store = context.watch<ChartStore>();
+    final store = context.read<ChartStoreRegistry>().storeFor(widget.storeKey);
     final watch = context.watch<MarketWatchStore>();
+    return ListenableBuilder(
+      listenable: store,
+      builder: (context, _) => _buildPanel(store, watch),
+    );
+  }
+
+  Widget _buildPanel(ChartStore store, MarketWatchStore watch) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       store.refreshIfNeeded();
     });
@@ -41,7 +52,11 @@ class _ChartPanelState extends State<ChartPanel> {
 
     return Column(
       children: [
-        _Toolbar(store: store, watch: watch),
+        _Toolbar(
+          store: store,
+          watch: watch,
+          onToggleSync: () => _toggleSync(store),
+        ),
         const Divider(height: 1),
         _DrawingToolbar(
           store: store,
@@ -257,6 +272,10 @@ class _ChartPanelState extends State<ChartPanel> {
     store.setTool(tool);
   }
 
+  void _toggleSync(ChartStore store) {
+    context.read<ChartStoreRegistry>().setSynced(widget.storeKey, !store.synced);
+  }
+
   /// Multi-point tools (channel, pitchfork) are drawn in two drags: the first
   /// sets the two base anchors, the second sets the final anchor.
   void _finishMultiPointDrag(ChartStore store, ChartGeometry geo, Object draft) {
@@ -369,10 +388,11 @@ class _ChartPanelState extends State<ChartPanel> {
 }
 
 class _Toolbar extends StatelessWidget {
-  const _Toolbar({required this.store, required this.watch});
+  const _Toolbar({required this.store, required this.watch, required this.onToggleSync});
 
   final ChartStore store;
   final MarketWatchStore watch;
+  final VoidCallback onToggleSync;
 
   @override
   Widget build(BuildContext context) {
@@ -415,6 +435,18 @@ class _Toolbar extends StatelessWidget {
           ),
           _IndicatorMenu(store: store),
           const SizedBox(width: 6),
+          IconButton(
+            onPressed: onToggleSync,
+            icon: Icon(
+              store.synced ? Icons.link : Icons.link_off,
+              size: 14,
+              color: store.synced ? EntryXColors.accentBright : EntryXColors.textDim,
+            ),
+            tooltip: store.synced ? 'Unlink from synced charts' : 'Sync with other charts',
+            visualDensity: VisualDensity.compact,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 26, minHeight: 26),
+          ),
           IconButton(
             onPressed: store.refresh,
             icon: const Icon(Icons.refresh, size: 14, color: EntryXColors.textDim),

@@ -9,7 +9,7 @@ import '../core/token_store.dart';
 import '../core/ws_client.dart';
 import '../features/auth/auth_screen.dart';
 import '../features/auth/auth_store.dart';
-import '../features/chart/chart_store.dart';
+import '../features/chart/chart_store_registry.dart';
 import '../features/market/market_watch_store.dart';
 import '../features/shell/entryx_shell.dart';
 import '../features/shell/system_status_store.dart';
@@ -31,7 +31,7 @@ class _EntryXAppState extends State<EntryXApp> {
   late final SystemStatusStore _status;
   late final WorkspaceStore _workspace;
   late final MarketWatchStore _marketWatch;
-  late final ChartStore _chart;
+  late final ChartStoreRegistry _charts;
 
   @override
   void initState() {
@@ -43,13 +43,13 @@ class _EntryXAppState extends State<EntryXApp> {
     _status = SystemStatusStore(api: _api, ws: _ws);
     _workspace = WorkspaceStore(api: _api);
     _marketWatch = MarketWatchStore(api: _api, ws: _ws);
-    _chart = ChartStore(api: _api, ws: _ws);
+    _charts = ChartStoreRegistry(api: _api, ws: _ws);
     _auth.restore();
   }
 
   @override
   void dispose() {
-    _chart.dispose();
+    _charts.dispose();
     _marketWatch.dispose();
     _workspace.dispose();
     _status.dispose();
@@ -69,7 +69,7 @@ class _EntryXAppState extends State<EntryXApp> {
           Provider<ApiClient>.value(value: _api),
           ChangeNotifierProvider.value(value: _auth),
           ChangeNotifierProvider.value(value: _marketWatch),
-          ChangeNotifierProvider.value(value: _chart),
+          ChangeNotifierProvider.value(value: _charts),
         ],
         child: ListenableBuilder(
           listenable: _auth,

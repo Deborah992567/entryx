@@ -53,6 +53,8 @@ class ChartStore extends ChangeNotifier {
   int _nextDrawingId = 1;
   DrawingTool _tool = DrawingTool.select;
   Timer? _saveTimer;
+  ChartSyncGroup? _sync;
+  bool _disposed = false;
 
   static const List<String> _indicatorOrder = ['sma20', 'sma50', 'ema20', 'vwap', 'bollinger'];
   final Map<String, bool> _indicatorEnabled = {
@@ -73,6 +75,37 @@ class ChartStore extends ChangeNotifier {
   double? get crosshairPrice => _crosshairPrice;
   bool get followingLatest => _right == -1;
   bool get hasData => _candles.isNotEmpty;
+  bool get synced => _sync != null;
+
+  /// The right edge (in bar index terms, -1 = follow) shared with synced charts.
+  int get syncRight => _right;
+
+  /// Joins or leaves a chart sync group.
+  void setSyncGroup(ChartSyncGroup? group) {
+    if (identical(_sync, group)) return;
+    _sync?.leave(this);
+    _sync = group;
+    group?.join(this);
+    notifyListeners();
+  }
+
+  /// Applies a viewport pushed from another synced chart (no re-broadcast).
+  void applySyncedViewport(int right, int barsVisible) {
+    if (_right == right && _barsVisible == barsVisible) return;
+    _right = right;
+    _barsVisible = barsVisible;
+    _crosshairIndex = null;
+    _crosshairPrice = null;
+    notifyListeners();
+  }
+
+  /// Applies a crosshair pushed from another synced chart (no re-broadcast).
+  void applySyncedCrosshair(int? index, double? price) {
+    if (_crosshairIndex == index && _crosshairPrice == price) return;
+    _crosshairIndex = index;
+    _crosshairPrice = price;
+    notifyListeners();
+  }
 
   List<String> get indicatorKeys => List.unmodifiable(_indicatorOrder);
   bool indicatorEnabled(String key) => _indicatorEnabled[key] ?? false;
@@ -153,6 +186,7 @@ class ChartStore extends ChangeNotifier {
     _crosshairIndex = null;
     _crosshairPrice = null;
     notifyListeners();
+    _sync?.onViewportChanged(this);
   }
 
   void zoomBy(double factor) {
@@ -163,6 +197,7 @@ class ChartStore extends ChangeNotifier {
     _crosshairIndex = null;
     _crosshairPrice = null;
     notifyListeners();
+    _sync?.onViewportChanged(this);
   }
 
   void zoomIn() => zoomBy(1.25);
@@ -175,6 +210,7 @@ class ChartStore extends ChangeNotifier {
     _crosshairIndex = null;
     _crosshairPrice = null;
     notifyListeners();
+    _sync?.onViewportChanged(this);
   }
 
   void setCrosshair(int? index, double? price) {
@@ -182,6 +218,7 @@ class ChartStore extends ChangeNotifier {
     _crosshairIndex = index;
     _crosshairPrice = price;
     notifyListeners();
+    _sync?.onCrosshairChanged(this);
   }
 
   /// Allocates an id and appends a finished drawing.
@@ -267,7 +304,9 @@ class ChartStore extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
     _saveTimer?.cancel();
+    _sync?.leave(this);
     super.dispose();
   }
 
@@ -298,18 +337,23 @@ class ChartStore extends ChangeNotifier {
     try {
       final data = await _api
           .get('/market/candles?symbol=$_symbol&tf=${_timeframe.api}&limit=500') as List<dynamic>;
+      if (_disposed) return;
       _candles = data
           .map((e) => ChartCandle.fromJson(e as Map<String, dynamic>))
           .toList(growable: false);
       _right = -1;
       await _loadDrawings();
+      if (_disposed) return;
       notifyListeners();
     } catch (e) {
+      if (_disposed) return;
       _error = 'Failed to load candles: $e';
       notifyListeners();
     } finally {
-      _loading = false;
-      notifyListeners();
+      if (!_disposed) {
+        _loading = false;
+        notifyListeners();
+      }
     }
   }
 
@@ -394,5 +438,35 @@ class ChartStore extends ChangeNotifier {
       _subscribeCandleChannel();
     }
     notifyListeners();
+  }
+}
+
+/// A set of charts that share viewport + crosshair.
+///
+/// When one member pans/zooms/resets it broadcasts the new viewport to the
+/// others; crosshair moves are shared too. The origin chart does not receive
+/// its own broadcast back (that would be a no-op loop anyway, since the
+/// applied viewport is identical).
+class ChartSyncGroup {
+  final Set<ChartStore> _members = <ChartStore>{};
+
+  bool get isEmpty => _members.isEmpty;
+
+  void join(ChartStore store) => _members.add(store);
+
+  void leave(ChartStore store) => _members.remove(store);
+
+  void onViewportChanged(ChartStore origin) {
+    for (final member in _members) {
+      if (member == origin) continue;
+      member.applySyncedViewport(origin.syncRight, origin.barsVisible);
+    }
+  }
+
+  void onCrosshairChanged(ChartStore origin) {
+    for (final member in _members) {
+      if (member == origin) continue;
+      member.applySyncedCrosshair(origin.crosshairIndex, origin.crosshairPrice);
+    }
   }
 }
