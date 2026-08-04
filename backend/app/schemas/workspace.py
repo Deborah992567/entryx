@@ -28,3 +28,29 @@ class LayoutOut(BaseModel):
     is_default: bool
     created_at: datetime
     updated_at: datetime
+
+
+class DrawingIn(BaseModel):
+    kind: str = Field(min_length=1, max_length=32)
+    points_json: dict
+    style_json: dict = Field(default_factory=dict)
+
+
+class DrawingOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    layout_id: int | None
+    symbol: str
+    timeframe: str
+    kind: str
+    points_json: dict
+    style_json: dict
+    created_at: datetime
+    updated_at: datetime
+
+
+class DrawingsSync(BaseModel):
+    symbol: str = Field(min_length=1, max_length=32)
+    timeframe: str = Field(min_length=1, max_length=8)
+    drawings: list[DrawingIn]

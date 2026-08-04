@@ -17,6 +17,8 @@ Map<String, dynamic> candleJson(int ts, {double o = 100, double h = 102, double 
     };
 
 class _FakeApi extends ApiClient {
+  Map<String, List<Map<String, dynamic>>> saved = {};
+
   @override
   Future<dynamic> get(String path, {bool auth = true}) async {
     if (path.startsWith('/market/candles')) {
@@ -25,15 +27,30 @@ class _FakeApi extends ApiClient {
       if (symbol == 'EURUSD' || tf == 'M15') return [];
       return [for (var i = 0; i < 200; i++) candleJson(i)];
     }
+    if (path.startsWith('/workspace/drawings')) {
+      final key = '${Uri.parse(path).queryParameters['symbol']}:'
+          '${Uri.parse(path).queryParameters['timeframe']}';
+      return saved[key] ?? [];
+    }
+    return null;
+  }
+
+  @override
+  Future<dynamic> put(String path, {Object? body, bool auth = true}) async {
+    final b = body as Map<String, dynamic>;
+    saved['${b['symbol']}:${b['timeframe']}'] =
+        List<Map<String, dynamic>>.from((b['drawings'] as List).map((e) => e as Map<String, dynamic>));
     return null;
   }
 }
 
 void main() {
   late ChartStore store;
+  late _FakeApi api;
 
   setUp(() {
-    store = ChartStore(api: _FakeApi(), ws: WsClient());
+    api = _FakeApi();
+    store = ChartStore(api: api, ws: WsClient());
   });
 
   tearDown(() => store.dispose());
@@ -174,5 +191,57 @@ void main() {
     expect(store.crosshairIndex, 5);
     expect(store.crosshairPrice, closeTo(101.5, 1e-6));
     expect(store.activeBarIndex, 5);
+  });
+
+  test('drawing mutations are saved after the debounce', () async {
+    final api = store.api as _FakeApi;
+    await Future<void>.delayed(Duration.zero);
+    store.addDrawing(TrendLineDrawing(
+        id: store.nextDrawingId, p1: const ChartPoint(10, 100), p2: const ChartPoint(90, 110)));
+    store.addDrawing(FibRetracementDrawing(
+        id: store.nextDrawingId, p1: const ChartPoint(10, 110), p2: const ChartPoint(90, 100)));
+    await Future<void>.delayed(const Duration(milliseconds: 600));
+    final saved = api.saved['XAUUSD:H1']!;
+    expect(saved, hasLength(2));
+    expect(saved[0]['kind'], 'trendLine');
+    expect(saved[1]['kind'], 'fibonacci');
+    expect((saved[0]['points_json'] as Map)['p1'], {'bar': 10.0, 'price': 100.0});
+  });
+
+  test('drawings are scoped per symbol when saving', () async {
+    final api = store.api as _FakeApi;
+    await Future<void>.delayed(Duration.zero);
+    store.addDrawing(HorizontalLineDrawing(id: store.nextDrawingId, price: 105));
+    await store.setSymbol('EURUSD');
+    await Future<void>.delayed(const Duration(milliseconds: 600));
+    expect(api.saved['XAUUSD:H1']!.single['kind'], 'horizontal');
+    expect(api.saved.containsKey('EURUSD:H1'), isFalse);
+  });
+
+  test('drawings load from the server for the current chart', () async {
+    final api = store.api as _FakeApi;
+    await Future<void>.delayed(Duration.zero);
+    api.saved['XAUUSD:H1'] = [
+      {
+        'kind': 'vertical',
+        'points_json': {'type': 'vertical', 'id': 7, 'color': 3866623, 'bar': 42.0},
+      },
+    ];
+    await store.setSymbol('XAUUSD'); // no-op, triggers nothing
+    await store.refresh();
+    await Future<void>.delayed(Duration.zero);
+    expect(store.drawings, hasLength(1));
+    expect(store.drawings.single, isA<VerticalLineDrawing>());
+    expect((store.drawings.single as VerticalLineDrawing).bar, 42.0);
+    expect(store.nextDrawingId, 8);
+  });
+
+  test('clearing drawings persists an empty set', () async {
+    final api = store.api as _FakeApi;
+    await Future<void>.delayed(Duration.zero);
+    store.addDrawing(HorizontalLineDrawing(id: store.nextDrawingId, price: 105));
+    store.clearDrawings();
+    await Future<void>.delayed(const Duration(milliseconds: 600));
+    expect(api.saved['XAUUSD:H1'], isEmpty);
   });
 }

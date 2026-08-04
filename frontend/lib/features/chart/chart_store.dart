@@ -6,6 +6,8 @@
 /// the user pans back; panning past the newest bar snaps back to follow mode.
 library;
 
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import '../../core/api_client.dart';
@@ -50,6 +52,7 @@ class ChartStore extends ChangeNotifier {
   int? _selectedDrawingId;
   int _nextDrawingId = 1;
   DrawingTool _tool = DrawingTool.select;
+  Timer? _saveTimer;
 
   static const List<String> _indicatorOrder = ['sma20', 'sma50', 'ema20', 'vwap', 'bollinger'];
   final Map<String, bool> _indicatorEnabled = {
@@ -77,6 +80,8 @@ class ChartStore extends ChangeNotifier {
   List<ChartDrawing> get drawings => List.unmodifiable(_drawings);
   int? get selectedDrawingId => _selectedDrawingId;
   int get nextDrawingId => _nextDrawingId;
+  @visibleForTesting
+  ApiClient get api => _api;
   DrawingTool get tool => _tool;
   ChartDrawing? get selectedDrawing {
     if (_selectedDrawingId == null) return null;
@@ -108,6 +113,9 @@ class ChartStore extends ChangeNotifier {
   Future<void> setSymbol(String symbol) async {
     if (symbol == _symbol || symbol.isEmpty) return;
     _symbol = symbol;
+    _drawings = [];
+    _selectedDrawingId = null;
+    _nextDrawingId = 1;
     _resetView();
     _subscribeCandleChannel();
     await _load();
@@ -116,6 +124,9 @@ class ChartStore extends ChangeNotifier {
   Future<void> setTimeframe(Timeframe tf) async {
     if (tf == _timeframe) return;
     _timeframe = tf;
+    _drawings = [];
+    _selectedDrawingId = null;
+    _nextDrawingId = 1;
     _resetView();
     _subscribeCandleChannel();
     await _load();
@@ -179,6 +190,7 @@ class ChartStore extends ChangeNotifier {
     if (drawing.id >= _nextDrawingId) {
       _nextDrawingId = drawing.id + 1;
     }
+    _scheduleSave();
     notifyListeners();
   }
 
@@ -186,6 +198,7 @@ class ChartStore extends ChangeNotifier {
     _drawings = [
       for (final d in _drawings) d.id == drawing.id ? drawing : d,
     ];
+    _scheduleSave();
     notifyListeners();
   }
 
@@ -194,6 +207,7 @@ class ChartStore extends ChangeNotifier {
     if (_selectedDrawingId == id) {
       _selectedDrawingId = null;
     }
+    _scheduleSave();
     notifyListeners();
   }
 
@@ -205,6 +219,7 @@ class ChartStore extends ChangeNotifier {
   void clearDrawings() {
     _drawings = [];
     _selectedDrawingId = null;
+    _scheduleSave();
     notifyListeners();
   }
 
@@ -250,6 +265,12 @@ class ChartStore extends ChangeNotifier {
 
   Future<void> refresh() => _load();
 
+  @override
+  void dispose() {
+    _saveTimer?.cancel();
+    super.dispose();
+  }
+
   /// Reloads only when the store has no usable data yet (e.g. raced auth).
   Future<void> refreshIfNeeded() async {
     if (!_loading && _error.isNotEmpty) {
@@ -281,6 +302,7 @@ class ChartStore extends ChangeNotifier {
           .map((e) => ChartCandle.fromJson(e as Map<String, dynamic>))
           .toList(growable: false);
       _right = -1;
+      await _loadDrawings();
       notifyListeners();
     } catch (e) {
       _error = 'Failed to load candles: $e';
@@ -288,6 +310,59 @@ class ChartStore extends ChangeNotifier {
     } finally {
       _loading = false;
       notifyListeners();
+    }
+  }
+
+  /// Restores drawings for the current symbol/timeframe from the server.
+  Future<void> _loadDrawings() async {
+    try {
+      final data = await _api.get(
+          '/workspace/drawings?symbol=$_symbol&timeframe=${_timeframe.api}') as List<dynamic>;
+      final loaded = <ChartDrawing>[];
+      var maxId = 0;
+      for (final e in data) {
+        final d = chartDrawingFromJson(
+            (e as Map<String, dynamic>)['points_json'] as Map<String, dynamic>);
+        loaded.add(d);
+        if (d.id > maxId) maxId = d.id;
+      }
+      _drawings = loaded;
+      _nextDrawingId = maxId + 1;
+      notifyListeners();
+    } catch (_) {
+      // keep whatever is currently in memory
+    }
+  }
+
+  /// Debounces a full-chart save of the current drawings.
+  ///
+  /// The drawing set is snapshotted at schedule time so a pending save is not
+  /// corrupted if the user switches symbol/timeframe before it fires.
+  void _scheduleSave() {
+    _saveTimer?.cancel();
+    final symbol = _symbol;
+    final timeframe = _timeframe.api;
+    final snapshot = List<ChartDrawing>.of(_drawings);
+    _saveTimer = Timer(const Duration(milliseconds: 400), () {
+      _persistDrawings(symbol: symbol, timeframe: timeframe, drawings: snapshot);
+    });
+  }
+
+  Future<void> _persistDrawings({
+    required String symbol,
+    required String timeframe,
+    required List<ChartDrawing> drawings,
+  }) async {
+    try {
+      await _api.put('/workspace/drawings', body: {
+        'symbol': symbol,
+        'timeframe': timeframe,
+        'drawings': [
+          for (final d in drawings) {'kind': d.toJson()['type'], 'points_json': d.toJson()},
+        ],
+      });
+    } catch (_) {
+      // best-effort: drawings stay in memory and will be re-synced next time
     }
   }
 

@@ -1,16 +1,22 @@
-"""Workspace layout CRUD routes."""
+"""Workspace layout + chart drawing CRUD routes."""
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
 from app.db.models.user import User
-from app.db.models.workspace import ChartLayout
+from app.db.models.workspace import ChartLayout, Drawing
 from app.db.session import get_db
-from app.schemas.workspace import LayoutCreate, LayoutOut, LayoutUpdate
-from app.services import workspace_service
+from app.schemas.workspace import (
+    DrawingOut,
+    DrawingsSync,
+    LayoutCreate,
+    LayoutOut,
+    LayoutUpdate,
+)
+from app.services import drawing_service, workspace_service
 
 router = APIRouter(prefix="/workspace", tags=["workspace"])
 
@@ -50,3 +56,42 @@ def delete_layout(
     user: User = Depends(get_current_user),
 ) -> None:
     workspace_service.delete_layout(db, layout_id=layout_id, user_id=user.id)
+
+
+@router.get("/drawings", response_model=list[DrawingOut])
+def list_drawings(
+    symbol: str = Query(min_length=1, max_length=32),
+    timeframe: str = Query(min_length=1, max_length=8),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> list[Drawing]:
+    return drawing_service.list_drawings(
+        db, user_id=user.id, symbol=symbol, timeframe=timeframe
+    )
+
+
+@router.put("/drawings", response_model=list[DrawingOut])
+def sync_drawings(
+    body: DrawingsSync,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> list[Drawing]:
+    return drawing_service.replace_drawings(
+        db,
+        user_id=user.id,
+        symbol=body.symbol,
+        timeframe=body.timeframe,
+        items=body.drawings,
+    )
+
+
+@router.delete("/drawings", status_code=status.HTTP_204_NO_CONTENT)
+def clear_drawings(
+    symbol: str = Query(min_length=1, max_length=32),
+    timeframe: str = Query(min_length=1, max_length=8),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> None:
+    drawing_service.clear_drawings(
+        db, user_id=user.id, symbol=symbol, timeframe=timeframe
+    )

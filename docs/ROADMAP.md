@@ -33,9 +33,9 @@ Legend: `[x]` done · `[~]` in progress · `[ ]` planned
 - [x] Indicator engine (common interface): SMA, EMA, WMA, VWAP, RSI, MACD, Stochastic,
   ATR, ADX, CCI, ROC, Momentum, Bollinger, Ichimoku, PSAR, OBV, volume
 - [~] Price scale, time scale, auto-scroll, multiple charts, split views, synced charts
-- [~] Drawing tools (trendline, ray, h/v lines, rectangle, Fibonacci retracement done —
-  movable/editable/persistent; remaining: channel, ellipse, arrow, text, fib extension/fan,
-  pitchfork, S/R, persistence)
+- [~] Drawing tools (trendline, ray, h/v lines, rectangle, Fibonacci retracement,
+  persistence done — movable/editable/persistent per chart; remaining: channel, ellipse,
+  arrow, text, fib extension/fan, pitchfork, S/R)
 - [ ] Chart templates, themes, layout persistence integration
 
 ## PHASE 4 — Trading engine + risk
