@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pytest
 from fastapi.testclient import TestClient
 
 
@@ -98,4 +99,64 @@ def test_close_position_records_history(client: TestClient, auth_headers: dict) 
 
 def test_close_unknown_position_returns_400(client: TestClient, auth_headers: dict) -> None:
     resp = client.delete("/api/v1/trading/positions/p-nope", headers=auth_headers)
+    assert resp.status_code == 400
+
+
+def test_place_stop_limit_pending(client: TestClient, auth_headers: dict) -> None:
+    quote = client.get("/api/v1/market/quote?symbol=EURUSD", headers=auth_headers).json()
+    stop = round(quote["ask"] + 1.0, 5)
+    resp = client.post(
+        "/api/v1/trading/orders",
+        headers=auth_headers,
+        json={
+            "symbol": "EURUSD",
+            "side": "buy",
+            "type": "stop_limit",
+            "volume": 0.5,
+            "price": stop,
+            "limit_price": round(stop + 0.2, 5),
+            "expiry": "2099-01-01T00:00:00Z",
+            "magic": 7,
+            "comment": "l1",
+        },
+    )
+    assert resp.status_code == 201, resp.text
+    order = resp.json()
+    assert order["state"] == "pending"
+    assert order["type"] == "stop_limit"
+    assert order["limit_price"] == pytest.approx(round(stop + 0.2, 5))
+    assert order["expiry"] is not None
+    assert order["magic"] == 7
+    assert order["comment"] == "l1"
+
+    orders = client.get("/api/v1/trading/orders", headers=auth_headers).json()
+    assert any(o["id"] == order["id"] for o in orders)
+
+
+def test_expiry_in_past_returns_400(client: TestClient, auth_headers: dict) -> None:
+    resp = client.post(
+        "/api/v1/trading/orders",
+        headers=auth_headers,
+        json={"symbol": "EURUSD", "side": "buy", "type": "limit", "volume": 0.5, "price": 1.0, "expiry": "2020-01-01T00:00:00Z"},
+    )
+    assert resp.status_code == 400
+
+
+def test_invalid_sl_tp_returns_400(client: TestClient, auth_headers: dict) -> None:
+    resp = client.post(
+        "/api/v1/trading/orders",
+        headers=auth_headers,
+        json={"symbol": "EURUSD", "side": "buy", "type": "market", "volume": 1, "sl": 100_000},
+    )
+    assert resp.status_code == 400
+
+
+def test_invalid_stop_limit_returns_400(client: TestClient, auth_headers: dict) -> None:
+    quote = client.get("/api/v1/market/quote?symbol=EURUSD", headers=auth_headers).json()
+    stop = round(quote["ask"] + 1.0, 5)
+    resp = client.post(
+        "/api/v1/trading/orders",
+        headers=auth_headers,
+        json={"symbol": "EURUSD", "side": "buy", "type": "stop_limit", "volume": 0.5, "price": stop, "limit_price": round(stop - 0.1, 5)},
+    )
     assert resp.status_code == 400

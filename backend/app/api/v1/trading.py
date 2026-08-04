@@ -38,10 +38,12 @@ async def create_order(
             type=body.type,
             volume=body.volume,
             price=body.price,
+            limit_price=body.limit_price,
             sl=body.sl,
             tp=body.tp,
             magic=body.magic,
             comment=body.comment,
+            expiry=body.expiry,
         )
         order = await trading_service.place_order(user.id, request)
         return trading_service.to_order_out(order)

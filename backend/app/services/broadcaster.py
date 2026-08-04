@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import logging
 
+from app.services import trading_service
 from app.services.market_data import format_quote, market_data, next_quote
 from app.ws.manager import manager
 
@@ -23,10 +24,10 @@ async def _market_tick_loop() -> None:
     while True:
         for info in market_data.symbols():
             channel = f"market.{info.symbol}"
-            if not manager.channel_subscribers(channel):
-                continue
-            quote = next_quote(info.symbol)
-            await manager.broadcast(channel, "market.tick", format_quote(quote))
+            if manager.channel_subscribers(channel):
+                quote = next_quote(info.symbol)
+                await manager.broadcast(channel, "market.tick", format_quote(quote))
+            await trading_service.process_market(info.symbol)
         if manager.channel_subscribers("market.watch"):
             snapshot = [format_quote(next_quote(s.symbol)) for s in market_data.symbols()]
             await manager.broadcast("market.watch", "market.snapshot", snapshot)

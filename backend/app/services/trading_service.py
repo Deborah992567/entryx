@@ -32,9 +32,9 @@ def get_broker(user_id: int) -> PaperBroker:
         return broker
 
 
-def active_brokers() -> list[PaperBroker]:
+def active_brokers() -> list[tuple[int, PaperBroker]]:
     with _lock:
-        return list(_brokers.values())
+        return list(_brokers.items())
 
 
 def reset_brokers() -> None:
@@ -72,12 +72,14 @@ def to_order_out(order: BrokerOrder) -> dict:
         "type": order.type,
         "volume": order.volume,
         "price": order.price,
+        "limit_price": order.limit_price,
         "state": order.state,
         "filled_price": order.filled_price,
         "sl": order.sl,
         "tp": order.tp,
         "magic": order.magic,
         "comment": order.comment,
+        "expiry": order.expiry,
         "created_at": order.created_at,
     }
 
@@ -147,3 +149,23 @@ async def close_position(user_id: int, position_id: str) -> ClosedTrade:
     await manager.broadcast("history", "trade.closed", to_trade_out(trade))
     await manager.broadcast(f"account.{user_id}", "account.updated", account_summary(user_id))
     return trade
+
+
+async def process_market(symbol: str) -> None:
+    """Evaluate pending orders against a fresh quote for every account.
+
+    Called by the market tick loop so pending orders fill/expire in near
+    real-time and the resulting changes are broadcast.
+    """
+    for user_id, broker in active_brokers():
+        events = broker.on_quote(symbol)
+        for kind, order in events:
+            if kind == "order.filled":
+                await manager.broadcast("orders", "order.filled", to_order_out(order))
+                position = broker.position(order.id.replace("o-", "p-"))
+                quote = market_data.quote(position.symbol)
+                pnl = broker.floating_pnl(position, quote)
+                await manager.broadcast("positions", "position.opened", to_position_out(position, pnl))
+                await manager.broadcast(f"account.{user_id}", "account.updated", account_summary(user_id))
+            elif kind == "order.expired":
+                await manager.broadcast("orders", "order.expired", to_order_out(order))

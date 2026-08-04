@@ -40,7 +40,7 @@ Legend: `[x]` done · `[~]` in progress · `[ ]` planned
 
 ## PHASE 4 — Trading engine + risk
 
-- [ ] Order types: market, limit/stop variants incl. stop-limit; SL/TP, magic, comment, expiry
+- [x] Order types: market, limit/stop variants incl. stop-limit; SL/TP, magic, comment, expiry
 - [ ] Position management: open/close/partial close, modify SL/TP, trailing stop
 - [ ] Account: balance, equity, margin, free margin, margin level, floating/realized P&L,
   commission, swap, exposure

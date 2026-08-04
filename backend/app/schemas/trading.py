@@ -13,10 +13,12 @@ class OrderCreate(BaseModel):
     type: str = "market"
     volume: float = Field(gt=0)
     price: float | None = None
+    limit_price: float | None = None
     sl: float | None = None
     tp: float | None = None
     magic: int = 0
     comment: str = Field(default="", max_length=255)
+    expiry: datetime | None = None
 
     @field_validator("side", "type")
     @classmethod
@@ -33,12 +35,14 @@ class OrderOut(BaseModel):
     type: str
     volume: float
     price: float | None
+    limit_price: float | None = None
     state: str
     filled_price: float | None
     sl: float | None
     tp: float | None
     magic: int
     comment: str
+    expiry: datetime | None = None
     created_at: datetime
 
 

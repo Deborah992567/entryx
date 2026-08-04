@@ -38,13 +38,15 @@ class UnknownRefError(BrokerError):
 class OrderRequest:
     symbol: str
     side: str  # buy | sell
-    type: str  # market | limit | stop
+    type: str  # market | limit | stop | stop_limit
     volume: float
-    price: float | None = None  # required for limit / stop
+    price: float | None = None  # required for limit / stop / stop_limit
+    limit_price: float | None = None  # required for stop_limit
     sl: float | None = None
     tp: float | None = None
     magic: int = 0
     comment: str = ""
+    expiry: datetime | None = None  # pending orders only
 
 
 @dataclass(frozen=True)
@@ -55,13 +57,16 @@ class BrokerOrder:
     type: str
     volume: float
     price: float | None
-    state: str  # pending | filled | cancelled | rejected
+    state: str  # pending | filled | cancelled | rejected | expired
     filled_price: float | None
     sl: float | None
     tp: float | None
     magic: int
     comment: str
     created_at: datetime
+    limit_price: float | None = None
+    expiry: datetime | None = None
+    triggered: bool = False  # stop-limit: stop level crossed
 
 
 @dataclass(frozen=True)
@@ -178,20 +183,32 @@ class PaperBroker(BrokerAdapter):
         volume = round(request.volume, 4)
         if volume <= 0:
             raise InvalidOrderError("volume must be positive")
+        expiry = request.expiry
+        if expiry is not None:
+            if expiry.tzinfo is None:
+                expiry = expiry.replace(tzinfo=UTC)
+            if expiry <= datetime.now(UTC):
+                raise InvalidOrderError("expiry must be in the future")
+        quote = self._provider.quote(symbol)
 
         if request.type == "market":
-            quote = self._provider.quote(symbol)
             fill_price = quote.ask if request.side == "buy" else quote.bid
+            _validate_sl_tp(request.side, fill_price, request.sl, request.tp)
             return self._fill(
-                request, symbol=symbol, volume=volume, price=fill_price, state="filled"
+                request, symbol=symbol, volume=volume, price=round(fill_price, info.digits), state="filled"
             )
 
         if request.price is None:
-            raise InvalidOrderError("limit/stop orders require a price")
+            raise InvalidOrderError("limit/stop/stop-limit orders require a price")
         price = round(request.price, info.digits)
-        quote = self._provider.quote(symbol)
-        if _is_crossed(request.side, request.type, quote, price):
-            return self._fill(request, symbol=symbol, volume=volume, price=price, state="filled")
+        if request.type == "stop_limit":
+            if request.limit_price is None:
+                raise InvalidOrderError("stop-limit orders require a limit_price")
+            limit_price = round(request.limit_price, info.digits)
+            _validate_stop_limit(request.side, price, limit_price)
+        else:
+            limit_price = None
+        _validate_sl_tp(request.side, price, request.sl, request.tp)
 
         order = BrokerOrder(
             id=_new_id("o"),
@@ -207,9 +224,12 @@ class PaperBroker(BrokerAdapter):
             magic=request.magic,
             comment=request.comment,
             created_at=datetime.now(UTC),
+            limit_price=limit_price,
+            expiry=expiry,
         )
         self._orders[order.id] = order
-        return order
+        filled = self._maybe_fill(order, quote)
+        return filled if filled is not None else order
 
     def cancel_order(self, order_id: str) -> BrokerOrder:
         order = self._orders.get(order_id)
@@ -220,6 +240,30 @@ class PaperBroker(BrokerAdapter):
         cancelled = _replace(order, state="cancelled")
         self._orders[order_id] = cancelled
         return cancelled
+
+    def on_quote(self, symbol: str, *, now: datetime | None = None) -> list[tuple[str, BrokerOrder]]:
+        """Process pending orders against the latest quote for ``symbol``.
+
+        Expired pending orders transition to ``expired``; crossed limit/stop/
+        stop-limit orders fill. Returns ``(event, order)`` pairs the caller can
+        broadcast on the wire.
+        """
+        quote = self._provider.quote(symbol)
+        now = now or datetime.now(UTC)
+        events: list[tuple[str, BrokerOrder]] = []
+        for oid in list(self._orders):
+            order = self._orders[oid]
+            if order.symbol != symbol or order.state != "pending":
+                continue
+            if order.expiry is not None and order.expiry < now:
+                expired = _replace(order, state="expired")
+                self._orders[oid] = expired
+                events.append(("order.expired", expired))
+                continue
+            filled = self._maybe_fill(order, quote)
+            if filled is not None:
+                events.append(("order.filled", filled))
+        return events
 
     # -- positions ------------------------------------------------------------
 
@@ -302,12 +346,37 @@ class PaperBroker(BrokerAdapter):
 
     # -- internals ------------------------------------------------------------
 
-    def _fill(self, request: OrderRequest, *, symbol: str, volume: float, price: float, state: str) -> BrokerOrder:
+    def _maybe_fill(self, order: BrokerOrder, quote: Quote) -> BrokerOrder | None:
+        """Fill ``order`` against ``quote`` if its trigger conditions are met."""
+        if order.type == "stop_limit":
+            triggered = order.triggered
+            if not triggered:
+                stop_crossed = quote.ask >= order.price if order.side == "buy" else quote.bid <= order.price
+                if stop_crossed:
+                    triggered = True
+                    order = _replace(order, triggered=True)
+                    self._orders[order.id] = order
+            if not triggered:
+                return None
+            limit_crossed = quote.ask <= order.limit_price if order.side == "buy" else quote.bid >= order.limit_price
+            if not limit_crossed:
+                return None
+            return self._fill(
+                order, symbol=order.symbol, volume=order.volume, price=order.limit_price, state="filled", order_id=order.id
+            )
+        if _is_crossed(order.side, order.type, quote, order.price):
+            return self._fill(
+                order, symbol=order.symbol, volume=order.volume, price=order.price, state="filled", order_id=order.id
+            )
+        return None
+
+    def _fill(self, request: OrderRequest, *, symbol: str, volume: float, price: float, state: str, order_id: str | None = None) -> BrokerOrder:
         info = self._provider.symbol_info(symbol)
         margin = self.margin_required(symbol, volume, price)
+        oid = order_id or _new_id("o")
         if margin > self._account.balance:
             return BrokerOrder(
-                id=_new_id("o"),
+                id=oid,
                 symbol=symbol,
                 side=request.side,
                 type=request.type,
@@ -320,12 +389,13 @@ class PaperBroker(BrokerAdapter):
                 magic=request.magic,
                 comment=request.comment,
                 created_at=datetime.now(UTC),
+                limit_price=request.limit_price,
+                expiry=request.expiry,
             )
         notional = price * info.contract_size * volume
         commission = round(notional * COMMISSION_RATE, 2)
-        shared = uuid.uuid4().hex[:12]
         order = BrokerOrder(
-            id=f"o-{shared}",
+            id=oid,
             symbol=symbol,
             side=request.side,
             type=request.type,
@@ -338,10 +408,12 @@ class PaperBroker(BrokerAdapter):
             magic=request.magic,
             comment=request.comment,
             created_at=datetime.now(UTC),
+            limit_price=request.limit_price,
+            expiry=request.expiry,
         )
         self._orders[order.id] = order
         position = BrokerPosition(
-            id=f"p-{shared}",
+            id=f"p-{oid[2:]}" if oid.startswith("o-") else f"p-{uuid.uuid4().hex[:12]}",
             symbol=symbol,
             side=request.side,
             volume=volume,
@@ -375,14 +447,42 @@ def _replace(order: BrokerOrder, **kwargs) -> BrokerOrder:
         magic=kwargs.get("magic", order.magic),
         comment=kwargs.get("comment", order.comment),
         created_at=kwargs.get("created_at", order.created_at),
+        limit_price=kwargs.get("limit_price", order.limit_price),
+        expiry=kwargs.get("expiry", order.expiry),
+        triggered=kwargs.get("triggered", order.triggered),
     )
 
 
 def _validate_request(request: OrderRequest) -> None:
     if request.side not in {"buy", "sell"}:
         raise InvalidOrderError("side must be 'buy' or 'sell'")
-    if request.type not in {"market", "limit", "stop"}:
-        raise InvalidOrderError("type must be 'market', 'limit' or 'stop'")
+    if request.type not in {"market", "limit", "stop", "stop_limit"}:
+        raise InvalidOrderError("type must be 'market', 'limit', 'stop' or 'stop_limit'")
+
+
+def _validate_sl_tp(side: str, price: float, sl: float | None, tp: float | None) -> None:
+    if sl is not None:
+        if side == "buy" and sl >= price:
+            raise InvalidOrderError("buy stop loss must be below the entry price")
+        if side == "sell" and sl <= price:
+            raise InvalidOrderError("sell stop loss must be above the entry price")
+    if tp is not None:
+        if side == "buy" and tp <= price:
+            raise InvalidOrderError("buy take profit must be above the entry price")
+        if side == "sell" and tp >= price:
+            raise InvalidOrderError("sell take profit must be below the entry price")
+    if sl is not None and tp is not None:
+        if side == "buy" and sl >= tp:
+            raise InvalidOrderError("take profit must be above the stop loss")
+        if side == "sell" and sl <= tp:
+            raise InvalidOrderError("stop loss must be above the take profit")
+
+
+def _validate_stop_limit(side: str, stop: float, limit: float) -> None:
+    if side == "buy" and limit < stop:
+        raise InvalidOrderError("buy stop-limit requires limit_price >= price")
+    if side == "sell" and limit > stop:
+        raise InvalidOrderError("sell stop-limit requires limit_price <= price")
 
 
 def _is_crossed(side: str, order_type: str, quote: Quote, price: float) -> bool:
