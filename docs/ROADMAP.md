@@ -49,7 +49,7 @@ Legend: `[x]` done · `[~]` in progress · `[ ]` planned
 
 ## PHASE 5 — Strategy + Backtesting + Optimization
 
-- [ ] Strategy framework: `initialize/on_tick/on_candle/on_signal/on_order/on_position/shutdown`
+- [x] Strategy framework: `initialize/on_tick/on_candle/on_signal/on_order/on_position/shutdown`
 - [ ] Backtester: candle/tick replay, commission/spread/slippage/swap/leverage, SL/TP/trailing
 - [ ] Metrics: trades, win rate, PF, max DD, Sharpe, expectancy, equity curve
 - [ ] Visual backtest results on chart; parameter optimization with overfit warnings
@@ -103,8 +103,8 @@ Legend: `[x]` done · `[~]` in progress · `[ ]` planned
 | 1 | Foundation | done |
 | 2 | Market data + paper broker + real-time | done |
 | 3 | Chart engine + indicators + drawings | done |
-| 4 | Trading engine + risk | planned |
-| 5 | Strategy + backtesting + optimization | planned |
+| 4 | Trading engine + risk | done |
+| 5 | Strategy + backtesting + optimization | in progress |
 | 6 | Market structure + SMC | planned |
 | 7 | Local AI infrastructure | planned |
 | 8 | AI applications | planned |

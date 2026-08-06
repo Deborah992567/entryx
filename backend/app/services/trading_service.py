@@ -17,6 +17,7 @@ from app.services.broker import (
     PaperBroker,
 )
 from app.services.market_data import market_data
+from app.services.strategy import strategy_engine
 from app.ws.manager import manager
 
 _lock = threading.Lock()
@@ -98,6 +99,7 @@ def to_position_out(position: BrokerPosition, floating_pnl: float = 0.0) -> dict
         "tp": position.tp,
         "opened_at": position.opened_at,
         "commission": position.commission,
+        "magic": position.magic,
         "trail": position.trail,
         "floating_pnl": floating_pnl,
     }
@@ -187,3 +189,4 @@ async def process_market(symbol: str) -> None:
                 await manager.broadcast("positions", "position.closed", to_trade_out(payload))
                 await manager.broadcast("history", "trade.closed", to_trade_out(payload))
                 await manager.broadcast(f"account.{user_id}", "account.updated", account_summary(user_id))
+    strategy_engine.feed_quote(symbol)

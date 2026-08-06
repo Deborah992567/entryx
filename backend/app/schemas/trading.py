@@ -58,6 +58,7 @@ class PositionOut(BaseModel):
     tp: float | None
     opened_at: datetime
     commission: float
+    magic: int = 0
     trail: float | None = None
     floating_pnl: float = 0.0
 

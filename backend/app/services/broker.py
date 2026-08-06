@@ -96,6 +96,7 @@ class BrokerPosition:
     tp: float | None
     opened_at: datetime
     commission: float
+    magic: int = 0  # owning strategy (0 = manual)
     trail: float | None = None  # trailing-stop distance in price units
     trail_extreme: float | None = None  # extreme price seen since trailing started
 
@@ -573,6 +574,7 @@ class PaperBroker(BrokerAdapter):
             tp=request.tp,
             opened_at=order.created_at,
             commission=commission,
+            magic=request.magic,
         )
         self._positions[position.id] = position
         self._account.balance = round(self._account.balance - commission, 2)
@@ -616,6 +618,7 @@ def _replace_position(position: BrokerPosition, **kwargs) -> BrokerPosition:
         tp=kwargs.get("tp", position.tp),
         opened_at=kwargs.get("opened_at", position.opened_at),
         commission=kwargs.get("commission", position.commission),
+        magic=kwargs.get("magic", position.magic),
         trail=kwargs.get("trail", position.trail),
         trail_extreme=kwargs.get("trail_extreme", position.trail_extreme),
     )
