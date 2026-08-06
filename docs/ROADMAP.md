@@ -44,7 +44,7 @@ Legend: `[x]` done · `[~]` in progress · `[ ]` planned
 - [x] Position management: open/close/partial close, modify SL/TP, trailing stop
 - [x] Account: balance, equity, margin, free margin, margin level, floating/realized P&L,
   commission, swap, exposure
-- [ ] Risk engine (UI-independent): position sizing, risk %, RR, exposure, margin, limits
+- [x] Risk engine (UI-independent): position sizing, risk %, RR, exposure, margin, limits
 - [ ] Trading Terminal tabs: Positions, Orders, History, Account, Journal, Alerts, Experts, Logs
 
 ## PHASE 5 — Strategy + Backtesting + Optimization

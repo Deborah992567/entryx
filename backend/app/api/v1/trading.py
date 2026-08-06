@@ -15,12 +15,19 @@ from app.schemas.trading import (
     PositionClose,
     PositionModify,
     PositionOut,
+    RiskAssess,
+    RiskAssessmentOut,
+    RiskLimitsOut,
     TradeOut,
 )
 from app.services import trading_service
 from app.services.broker import BrokerError, OrderRequest
+from app.services.market_data import market_data
+from app.services.risk_engine import RiskEngine
 
 router = APIRouter(prefix="/trading", tags=["trading"])
+
+risk_engine = RiskEngine(market_data)
 
 
 @router.get("/account", response_model=AccountOut)
@@ -122,3 +129,26 @@ async def modify_position(
 @router.get("/history", response_model=list[TradeOut])
 def list_history(user: User = Depends(get_current_user), _db: Session = Depends(get_db)) -> list[dict]:
     return [trading_service.to_trade_out(t) for t in trading_service.get_broker(user.id).closed_trades()]
+
+
+@router.post("/risk/assess", response_model=RiskAssessmentOut)
+def assess_risk(
+    body: RiskAssess,
+    user: User = Depends(get_current_user),
+    _db: Session = Depends(get_db),
+) -> dict:
+    return risk_engine.assess(
+        symbol=body.symbol.upper(),
+        equity=body.equity,
+        risk_pct=body.risk_pct,
+        entry=body.entry,
+        sl=body.sl,
+        tp=body.tp,
+        leverage=body.leverage,
+    )
+
+
+@router.get("/risk/limits", response_model=RiskLimitsOut)
+def risk_limits(user: User = Depends(get_current_user), _db: Session = Depends(get_db)) -> dict:
+    limits = risk_engine.limits
+    return {field: getattr(limits, field) for field in RiskLimitsOut.model_fields}

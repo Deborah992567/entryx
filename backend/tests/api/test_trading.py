@@ -235,3 +235,26 @@ def test_account_exposes_commission_swap_exposure(client: TestClient, auth_heade
     assert account["exposure"] > 0
     assert account["margin_used"] > 0
     assert account["free_margin"] < account["equity"]
+
+
+def test_risk_assess_endpoint(client: TestClient, auth_headers: dict) -> None:
+    resp = client.post(
+        "/api/v1/trading/risk/assess",
+        headers=auth_headers,
+        json={"symbol": "EURUSD", "equity": 10_000, "risk_pct": 2, "entry": 1.10, "sl": 1.09, "tp": 1.13},
+    )
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    assert data["lots"] == pytest.approx(0.2)
+    assert data["rr"] == pytest.approx(3.0)
+    assert data["exposure"] == pytest.approx(22_000)
+    assert data["min_lots"] == pytest.approx(0.01)
+
+
+def test_risk_limits_endpoint(client: TestClient, auth_headers: dict) -> None:
+    resp = client.get("/api/v1/trading/risk/limits", headers=auth_headers)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["max_lots_per_order"] == pytest.approx(100)
+    assert data["max_risk_pct_per_trade"] == pytest.approx(5)
+    assert data["max_open_positions"] == 50
