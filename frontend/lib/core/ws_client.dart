@@ -21,12 +21,12 @@ class WsClient {
   final TokenStore _store;
   final _listeners = <String, List<void Function(Map<String, dynamic>)>>{};
   final _subscribed = <String>{};
+  final _statusListeners = <void Function(ConnectionStatus)>[];
 
   WebSocketChannel? _channel;
   StreamSubscription? _sub;
   Timer? _reconnectTimer;
   ConnectionStatus _status = ConnectionStatus.disconnected;
-  void Function(ConnectionStatus)? onStatusChanged;
   void Function()? onAuthExpired;
   bool _disposed = false;
 
@@ -35,6 +35,11 @@ class WsClient {
   /// Subscribe to an event type (wildcard matching handled by listeners).
   void on(String type, void Function(Map<String, dynamic> event) handler) {
     _listeners.putIfAbsent(type, () => []).add(handler);
+  }
+
+  /// Register a listener for connection-status changes (multiple allowed).
+  void addStatusListener(void Function(ConnectionStatus) listener) {
+    _statusListeners.add(listener);
   }
 
   Future<void> connect() async {
@@ -106,7 +111,9 @@ class WsClient {
   void _setStatus(ConnectionStatus status) {
     if (_status == status) return;
     _status = status;
-    onStatusChanged?.call(status);
+    for (final listener in List.of(_statusListeners)) {
+      listener(status);
+    }
   }
 
   Future<void> dispose() async {

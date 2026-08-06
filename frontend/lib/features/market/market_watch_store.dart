@@ -17,7 +17,7 @@ class MarketWatchStore extends ChangeNotifier {
         _ws = ws {
     _ws.on('market.snapshot', _onSnapshot);
     _ws.on('market.tick', _onTick);
-    _ws.onStatusChanged = _onStatusChanged;
+    _ws.addStatusListener(_onStatusChanged);
     _loadSymbols();
     _ws.subscribe(const ['market.watch']);
   }

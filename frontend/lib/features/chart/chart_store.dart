@@ -27,7 +27,7 @@ class ChartStore extends ChangeNotifier {
         _symbol = symbol,
         _timeframe = timeframe {
     _ws.on('market.candle', _onCandle);
-    _ws.onStatusChanged = _onStatusChanged;
+    _ws.addStatusListener(_onStatusChanged);
     _subscribeCandleChannel();
     _load();
   }

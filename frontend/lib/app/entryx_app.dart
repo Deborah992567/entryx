@@ -14,6 +14,7 @@ import '../features/market/market_watch_store.dart';
 import '../features/shell/entryx_shell.dart';
 import '../features/shell/system_status_store.dart';
 import '../features/shell/workspace/workspace_store.dart';
+import '../features/trading/trading_store.dart';
 import 'theme.dart';
 
 class EntryXApp extends StatefulWidget {
@@ -32,6 +33,7 @@ class _EntryXAppState extends State<EntryXApp> {
   late final WorkspaceStore _workspace;
   late final MarketWatchStore _marketWatch;
   late final ChartStoreRegistry _charts;
+  late final TradingStore _trading;
 
   @override
   void initState() {
@@ -44,11 +46,13 @@ class _EntryXAppState extends State<EntryXApp> {
     _workspace = WorkspaceStore(api: _api);
     _marketWatch = MarketWatchStore(api: _api, ws: _ws);
     _charts = ChartStoreRegistry(api: _api, ws: _ws);
+    _trading = TradingStore(api: _api, ws: _ws, auth: _auth);
     _auth.restore();
   }
 
   @override
   void dispose() {
+    _trading.dispose();
     _charts.dispose();
     _marketWatch.dispose();
     _workspace.dispose();
@@ -71,6 +75,7 @@ class _EntryXAppState extends State<EntryXApp> {
           ChangeNotifierProvider.value(value: _marketWatch),
           ChangeNotifierProvider.value(value: _charts),
           ChangeNotifierProvider.value(value: _workspace),
+          ChangeNotifierProvider.value(value: _trading),
         ],
         child: ListenableBuilder(
           listenable: _auth,

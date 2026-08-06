@@ -45,7 +45,7 @@ Legend: `[x]` done · `[~]` in progress · `[ ]` planned
 - [x] Account: balance, equity, margin, free margin, margin level, floating/realized P&L,
   commission, swap, exposure
 - [x] Risk engine (UI-independent): position sizing, risk %, RR, exposure, margin, limits
-- [ ] Trading Terminal tabs: Positions, Orders, History, Account, Journal, Alerts, Experts, Logs
+- [x] Trading Terminal tabs: Positions, Orders, History, Account, Journal, Alerts, Experts, Logs
 
 ## PHASE 5 — Strategy + Backtesting + Optimization
 

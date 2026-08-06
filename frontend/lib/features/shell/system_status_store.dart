@@ -13,7 +13,7 @@ class SystemStatusStore extends ChangeNotifier {
   SystemStatusStore({required ApiClient api, required WsClient ws})
       : _api = api,
         _ws = ws {
-    _ws.onStatusChanged = (_) => notifyListeners();
+    _ws.addStatusListener((_) => notifyListeners());
   }
 
   final ApiClient _api;
