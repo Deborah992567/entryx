@@ -50,7 +50,7 @@ Legend: `[x]` done · `[~]` in progress · `[ ]` planned
 ## PHASE 5 — Strategy + Backtesting + Optimization
 
 - [x] Strategy framework: `initialize/on_tick/on_candle/on_signal/on_order/on_position/shutdown`
-- [ ] Backtester: candle/tick replay, commission/spread/slippage/swap/leverage, SL/TP/trailing
+- [x] Backtester: bar-by-bar candle replay, commission/spread/slippage/swap/leverage, SL/TP/trailing, equity curve + trades API
 - [ ] Metrics: trades, win rate, PF, max DD, Sharpe, expectancy, equity curve
 - [ ] Visual backtest results on chart; parameter optimization with overfit warnings
 

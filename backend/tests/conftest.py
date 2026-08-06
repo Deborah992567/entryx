@@ -37,9 +37,11 @@ def _reset_state():
     ws_manager.manager._channels.clear()
     ws_manager.manager._seq.clear()
     trading_service.reset_brokers()
+    from app.services.backtest import backtest_store
     from app.services.strategy import strategy_engine
 
     strategy_engine.clear()
+    backtest_store.clear()
     yield
 
 

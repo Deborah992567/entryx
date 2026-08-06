@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from app.api.v1 import auth, health, market, strategies, trading, users, workspace
+from app.api.v1 import auth, backtests, health, market, strategies, trading, users, workspace
 
 api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(auth.router)
@@ -13,4 +13,5 @@ api_router.include_router(workspace.router)
 api_router.include_router(market.router)
 api_router.include_router(trading.router)
 api_router.include_router(strategies.router)
+api_router.include_router(backtests.router)
 api_router.include_router(health.router)
