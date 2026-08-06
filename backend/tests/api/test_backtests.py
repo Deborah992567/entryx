@@ -32,6 +32,10 @@ def test_create_backtest_returns_result(client: TestClient, auth_headers: dict) 
     assert body["status"] == "stopped"
     assert body["metrics"]["start_balance"] == 10_000
     assert body["metrics"]["total_trades"] >= 0
+    assert "win_rate" in body["metrics"]
+    assert "profit_factor" in body["metrics"]
+    assert "max_drawdown" in body["metrics"]
+    assert "expectancy" in body["metrics"]
     assert len(body["equity_curve"]) == 10
     assert isinstance(body["config"], dict)
     assert body["config"]["spread_mult"] == 0.0

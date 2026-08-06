@@ -33,6 +33,28 @@ class BacktestEquityPointOut(BaseModel):
     equity: float
 
 
+class BacktestMetricsOut(BaseModel):
+    start_balance: float
+    end_balance: float
+    net_profit: float
+    total_trades: int
+    winning_trades: int
+    losing_trades: int
+    breakeven_trades: int
+    win_rate: float
+    gross_profit: float
+    gross_loss: float
+    profit_factor: float | None = None
+    expectancy: float
+    avg_win: float
+    avg_loss: float
+    largest_win: float
+    largest_loss: float
+    max_drawdown: float
+    max_drawdown_pct: float
+    sharpe: float | None = None
+
+
 class BacktestTradeOut(BaseModel):
     id: str
     symbol: str
@@ -59,6 +81,6 @@ class BacktestResultOut(BaseModel):
     started_at: datetime
     finished_at: datetime
     config: dict
-    metrics: dict
+    metrics: BacktestMetricsOut
     equity_curve: list[BacktestEquityPointOut]
     trades: list[BacktestTradeOut]

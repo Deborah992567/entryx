@@ -51,7 +51,7 @@ Legend: `[x]` done · `[~]` in progress · `[ ]` planned
 
 - [x] Strategy framework: `initialize/on_tick/on_candle/on_signal/on_order/on_position/shutdown`
 - [x] Backtester: bar-by-bar candle replay, commission/spread/slippage/swap/leverage, SL/TP/trailing, equity curve + trades API
-- [ ] Metrics: trades, win rate, PF, max DD, Sharpe, expectancy, equity curve
+- [x] Metrics: win rate, profit factor, max drawdown (currency + %), Sharpe, expectancy, equity curve
 - [ ] Visual backtest results on chart; parameter optimization with overfit warnings
 
 ## PHASE 6 — Market structure + Smart Money Concepts

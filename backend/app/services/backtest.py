@@ -38,6 +38,7 @@ from app.services.broker import (
     _validate_stop_limit,
 )
 from app.services.market_data import Candle, MarketDataProvider, Quote, market_data
+from app.services.metrics import compute_metrics
 from app.services.strategy import _REGISTRY, MagicCounter, StrategyRunner
 
 
@@ -614,15 +615,13 @@ def run_backtest(
 
     summary = runner.stop()
     trades = [trade_to_dict(t, broker) for t in broker.closed_trades()]
-    end_balance = broker.account().balance
-    metrics = {
-        "start_balance": config.initial_balance,
-        "end_balance": end_balance,
-        "net_profit": round(end_balance - config.initial_balance, 2),
-        "total_trades": len(trades),
-        "winning_trades": sum(1 for t in trades if t["net_pnl"] > 0),
-        "losing_trades": sum(1 for t in trades if t["net_pnl"] < 0),
-    }
+    metrics = compute_metrics(
+        trades,
+        curve,
+        initial_balance=config.initial_balance,
+        timeframe=timeframe,
+        end_balance=broker.account().balance,
+    )
     return {
         "id": instance_id,
         "strategy": summary["strategy"],

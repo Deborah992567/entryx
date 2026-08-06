@@ -121,6 +121,8 @@ def test_equity_curve_has_one_point_per_bar() -> None:
     assert len(result["equity_curve"]) == len(series)
     assert result["equity_curve"][0]["equity"] == pytest.approx(100_000.0)
     assert result["metrics"]["total_trades"] == 1
+    for key in ("win_rate", "profit_factor", "expectancy", "max_drawdown", "max_drawdown_pct", "sharpe"):
+        assert key in result["metrics"]
 
 
 def test_run_without_candles_uses_provider() -> None:
