@@ -61,6 +61,9 @@ def account_summary(user_id: int) -> dict:
         "margin_level": margin_level,
         "floating_pnl": broker.floating_pnl_total(),
         "realized_pnl": realized,
+        "commission": broker.commission_total(),
+        "swap": broker.swap_total(),
+        "exposure": broker.exposure(),
     }
 
 
@@ -111,6 +114,7 @@ def to_trade_out(trade: ClosedTrade) -> dict:
         "gross_pnl": trade.gross_pnl,
         "net_pnl": trade.net_pnl,
         "commission": trade.commission,
+        "swap": trade.swap,
         "closed_at": trade.closed_at,
     }
 

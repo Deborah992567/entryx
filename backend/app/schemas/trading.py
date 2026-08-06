@@ -84,6 +84,7 @@ class TradeOut(BaseModel):
     gross_pnl: float
     net_pnl: float
     commission: float
+    swap: float = 0.0
     closed_at: datetime
 
 
@@ -97,3 +98,6 @@ class AccountOut(BaseModel):
     margin_level: float
     floating_pnl: float
     realized_pnl: float = 0.0
+    commission: float = 0.0
+    swap: float = 0.0
+    exposure: float = 0.0

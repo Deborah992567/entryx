@@ -380,3 +380,45 @@ def test_tp_hit_closes_position_via_quote() -> None:
     assert events[0][1].close_price == pytest.approx(1.11)
     assert events[0][1].net_pnl > 0
     assert broker.open_positions() == []
+
+
+# -- Line 3: account metrics (commission, swap, exposure) --------------------------
+
+
+def test_account_metrics_zero_on_fresh_account() -> None:
+    broker = PaperBroker(FakeProvider(1.09))
+    assert broker.commission_total() == 0
+    assert broker.swap_total() == 0
+    assert broker.exposure() == 0
+
+
+def test_commission_and_exposure_after_open() -> None:
+    broker = PaperBroker(FakeProvider(1.09))
+    broker.place_order(OrderRequest(symbol="EURUSD", side="buy", type="market", volume=1.0))
+    assert broker.commission_total() == pytest.approx(2.18)  # ~109002 notional * 2bps
+    assert broker.exposure() == pytest.approx(109_000)  # 1.09 * 100k lots
+    position = broker.open_positions()[0]
+    trade = broker.close_position(position.id)
+    assert trade.commission > 0
+    assert broker.commission_total() > 0
+
+
+def test_swap_pnl_accrual() -> None:
+    broker = PaperBroker(FakeProvider(1.09))
+    broker.place_order(OrderRequest(symbol="EURUSD", side="buy", type="market", volume=1.0))
+    position = broker.open_positions()[0]
+    at = position.opened_at + timedelta(days=1)
+    assert broker.swap_pnl(position, at) == pytest.approx(2.0)  # 0.2 pts * pip 10 * 1 lot
+
+    broker.place_order(OrderRequest(symbol="XAUUSD", side="buy", type="market", volume=2.0))
+    xau = next(p for p in broker.open_positions() if p.symbol == "XAUUSD")
+    assert broker.swap_pnl(xau, xau.opened_at + timedelta(days=1)) == pytest.approx(-3.0)
+
+
+def test_close_charges_swap_into_trade_and_total() -> None:
+    broker = PaperBroker(FakeProvider(1.09))
+    broker.place_order(OrderRequest(symbol="EURUSD", side="buy", type="market", volume=1.0))
+    position = broker.open_positions()[0]
+    trade = broker.close_position(position.id, at=position.opened_at + timedelta(days=1))
+    assert trade.swap == pytest.approx(2.0)
+    assert broker.swap_total() == pytest.approx(2.0)

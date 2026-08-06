@@ -17,6 +17,22 @@ from app.services.market_data import MarketDataProvider, Quote
 
 COMMISSION_RATE = 0.00002  # 2 bps of notional per side
 
+# Daily swap charged per lot in points (quote currency). Negative = cost.
+SWAP_POINTS_PER_LOT_DAY: dict[str, float] = {
+    "EURUSD": 0.2,
+    "GBPUSD": 0.1,
+    "USDJPY": -0.3,
+    "AUDUSD": 0.3,
+    "USDCAD": -0.2,
+    "USDCHF": -0.2,
+    "XAUUSD": -1.5,
+    "XAGUSD": -2.0,
+    "BTCUSD": -0.5,
+    "ETHUSD": -0.3,
+    "US500": -2.5,
+    "US30": -2.5,
+}
+
 
 class BrokerError(Exception):
     """Base error for broker operations."""
@@ -96,6 +112,7 @@ class ClosedTrade:
     net_pnl: float
     commission: float
     closed_at: datetime
+    swap: float = 0.0
 
 
 _UNSET = object()
@@ -161,6 +178,7 @@ class PaperBroker(BrokerAdapter):
         self._orders: dict[str, BrokerOrder] = {}
         self._positions: dict[str, BrokerPosition] = {}
         self._closed: list[ClosedTrade] = []
+        self._commission_total = 0.0
 
     # -- account --------------------------------------------------------------
 
@@ -290,10 +308,11 @@ class PaperBroker(BrokerAdapter):
 
     # -- positions ------------------------------------------------------------
 
-    def close_position(self, position_id: str, price: float | None = None, volume: float | None = None) -> ClosedTrade:
+    def close_position(self, position_id: str, price: float | None = None, volume: float | None = None, *, at: datetime | None = None) -> ClosedTrade:
         position = self._positions.get(position_id)
         if position is None:
             raise UnknownRefError(f"unknown position: {position_id}")
+        at = at or datetime.now(UTC)
         quote = self._provider.quote(position.symbol)
         close_price = price if price is not None else (quote.bid if position.side == "buy" else quote.ask)
         info = self._provider.symbol_info(position.symbol)
@@ -308,7 +327,8 @@ class PaperBroker(BrokerAdapter):
         close_notional = close_price * info.contract_size * volume
         close_commission = round(close_notional * COMMISSION_RATE, 2)
         open_commission = round(position.commission * volume / position.volume, 2)
-        net = round(gross - close_commission - open_commission, 2)
+        swap = self._swap_for(position, volume, at)
+        net = round(gross - close_commission - open_commission - swap, 2)
         trade = ClosedTrade(
             id=_new_id("t"),
             symbol=position.symbol,
@@ -319,9 +339,11 @@ class PaperBroker(BrokerAdapter):
             gross_pnl=round(gross, 2),
             net_pnl=net,
             commission=close_commission,
-            closed_at=datetime.now(UTC),
+            swap=swap,
+            closed_at=at,
         )
         self._account.balance = round(self._account.balance + net, 2)
+        self._commission_total = round(self._commission_total + close_commission, 2)
         if volume >= position.volume:
             del self._positions[position_id]
         else:
@@ -421,8 +443,38 @@ class PaperBroker(BrokerAdapter):
             total += self.floating_pnl(position, self._provider.quote(position.symbol))
         return round(total, 2)
 
-    def equity(self) -> float:
-        return round(self._account.balance + self.floating_pnl_total(), 2)
+    def swap_pnl(self, position: BrokerPosition, at: datetime) -> float:
+        info = self._provider.symbol_info(position.symbol)
+        points = SWAP_POINTS_PER_LOT_DAY.get(position.symbol, 0.0)
+        days = max(0.0, (at - position.opened_at).total_seconds() / 86_400.0)
+        return round(points * info.pip_value * position.volume * days, 2)
+
+    def swap_total(self, at: datetime | None = None) -> float:
+        at = at or datetime.now(UTC)
+        realized = sum(trade.swap for trade in self._closed)
+        accrued = sum(self.swap_pnl(position, at) for position in self._positions.values())
+        return round(realized + accrued, 2)
+
+    def commission_total(self) -> float:
+        return round(self._commission_total, 2)
+
+    def exposure(self) -> float:
+        total = 0.0
+        for position in self._positions.values():
+            quote = self._provider.quote(position.symbol)
+            info = self._provider.symbol_info(position.symbol)
+            price = quote.bid if position.side == "buy" else quote.ask
+            total += price * info.contract_size * position.volume
+        return round(total, 2)
+
+    def equity(self, at: datetime | None = None) -> float:
+        return round(self._account.balance + self.floating_pnl_total() + self.swap_total(at), 2)
+
+    def _swap_for(self, position: BrokerPosition, volume: float, at: datetime) -> float:
+        info = self._provider.symbol_info(position.symbol)
+        points = SWAP_POINTS_PER_LOT_DAY.get(position.symbol, 0.0)
+        days = max(0.0, (at - position.opened_at).total_seconds() / 86_400.0)
+        return round(points * info.pip_value * volume * days, 2)
 
     # -- internals ------------------------------------------------------------
 
@@ -524,6 +576,7 @@ class PaperBroker(BrokerAdapter):
         )
         self._positions[position.id] = position
         self._account.balance = round(self._account.balance - commission, 2)
+        self._commission_total = round(self._commission_total + commission, 2)
         return order
 
 

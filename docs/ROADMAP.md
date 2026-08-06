@@ -42,7 +42,7 @@ Legend: `[x]` done · `[~]` in progress · `[ ]` planned
 
 - [x] Order types: market, limit/stop variants incl. stop-limit; SL/TP, magic, comment, expiry
 - [x] Position management: open/close/partial close, modify SL/TP, trailing stop
-- [ ] Account: balance, equity, margin, free margin, margin level, floating/realized P&L,
+- [x] Account: balance, equity, margin, free margin, margin level, floating/realized P&L,
   commission, swap, exposure
 - [ ] Risk engine (UI-independent): position sizing, risk %, RR, exposure, margin, limits
 - [ ] Trading Terminal tabs: Positions, Orders, History, Account, Journal, Alerts, Experts, Logs

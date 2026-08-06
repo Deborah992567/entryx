@@ -217,3 +217,21 @@ def test_modify_position_invalid_returns_400(client: TestClient, auth_headers: d
     bad_sl = round(quote["bid"] + 1.0, 5)
     resp = client.patch(f"/api/v1/trading/positions/{position_id}", headers=auth_headers, json={"sl": bad_sl})
     assert resp.status_code == 400
+
+
+def test_account_exposes_commission_swap_exposure(client: TestClient, auth_headers: dict) -> None:
+    account = client.get("/api/v1/trading/account", headers=auth_headers).json()
+    assert account["commission"] == 0
+    assert account["swap"] == 0
+    assert account["exposure"] == 0
+
+    client.post(
+        "/api/v1/trading/orders",
+        headers=auth_headers,
+        json={"symbol": "EURUSD", "side": "buy", "type": "market", "volume": 1.0},
+    )
+    account = client.get("/api/v1/trading/account", headers=auth_headers).json()
+    assert account["commission"] > 0
+    assert account["exposure"] > 0
+    assert account["margin_used"] > 0
+    assert account["free_margin"] < account["equity"]

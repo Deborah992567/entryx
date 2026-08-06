@@ -43,7 +43,7 @@ and `system.error` with `{"code": "...", "message": "..."}` on failure.
 ### Trading / account
 | type | channel | data |
 |---|---|---|
-| `account.updated` | `account.<id>` | `{balance, equity, margin, free_margin, margin_level, floating_pnl, realized_pnl}` |
+| `account.updated` | `account.<id>` | `{balance, equity, margin, free_margin, margin_level, floating_pnl, realized_pnl, commission, swap, exposure}` |
 | `order.created` / `order.updated` / `order.cancelled` / `order.expired` | `orders` | Order object (incl. `limit_price`, `expiry`) |
 | `order.filled` | `orders` | Filled order object; a `position.opened` follows |
 | `position.opened` / `position.updated` / `position.closed` | `positions` | Position object (incl. pnl, `trail`) |
