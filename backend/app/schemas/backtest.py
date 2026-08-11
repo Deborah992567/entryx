@@ -1,8 +1,9 @@
-"""Backtest schemas (Phase 5 line 2)."""
+"""Backtest schemas (Phase 5 line 2; optimization added in line 4)."""
 
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -86,3 +87,47 @@ class BacktestResultOut(BaseModel):
     metrics: BacktestMetricsOut
     equity_curve: list[BacktestEquityPointOut]
     trades: list[BacktestTradeOut]
+
+
+class OptimizationRun(BaseModel):
+    strategy: str = Field(min_length=1, max_length=64)
+    symbol: str = Field(min_length=1, max_length=32)
+    timeframe: str = "H1"
+    candle_count: int = Field(default=1000, ge=10, le=50_000)
+    start_ts: datetime | None = None
+    end_ts: datetime | None = None
+    metric: str = "net_profit"
+    top_n: int = Field(default=20, ge=1, le=200)
+    param_ranges: dict[str, dict[str, Any]]
+    config: BacktestConfigIn = Field(default_factory=BacktestConfigIn)
+
+
+class OptimizationEntryOut(BaseModel):
+    rank: int
+    params: dict[str, Any]
+    metrics: BacktestMetricsOut
+
+
+class OptimizationWalkForwardOut(BaseModel):
+    first_half: BacktestMetricsOut
+    second_half: BacktestMetricsOut
+
+
+class OptimizationResultOut(BaseModel):
+    id: str
+    strategy: str
+    symbol: str
+    timeframe: str
+    candle_count: int
+    metric: str
+    top_n: int
+    combinations: int
+    started_at: datetime
+    finished_at: datetime
+    config: dict
+    overfit_score: float
+    overfit_label: str
+    warnings: list[str]
+    walk_forward: OptimizationWalkForwardOut | None = None
+    best: dict[str, Any]
+    results: list[OptimizationEntryOut]

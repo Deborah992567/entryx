@@ -77,6 +77,84 @@ def test_invalid_config_returns_400(client: TestClient, auth_headers: dict) -> N
     assert resp.status_code == 422
 
 
+def test_create_optimization_returns_ranked_results(client: TestClient, auth_headers: dict) -> None:
+    resp = client.post(
+        "/api/v1/backtests/optimize",
+        headers=auth_headers,
+        json={
+            "strategy": "sma_cross",
+            "symbol": "EURUSD",
+            "timeframe": "H1",
+            "candle_count": 200,
+            "metric": "net_profit",
+            "top_n": 5,
+            "param_ranges": {
+                "fast": {"values": [3, 5]},
+                "slow": {"values": [20, 30]},
+            },
+            "config": {"initial_balance": 10_000, "spread_mult": 0.0},
+        },
+    )
+    assert resp.status_code == 201, resp.text
+    body = resp.json()
+    assert body["strategy"] == "sma_cross"
+    assert body["combinations"] == 4
+    assert len(body["results"]) == 4
+    assert body["results"][0]["rank"] == 1
+    assert "overfit_score" in body
+    assert "overfit_label" in body
+    assert isinstance(body["warnings"], list)
+    assert "params" in body["best"]
+
+
+def test_get_optimization_returns_saved_run(client: TestClient, auth_headers: dict) -> None:
+    created = client.post(
+        "/api/v1/backtests/optimize",
+        headers=auth_headers,
+        json={
+            "strategy": "sma_cross",
+            "symbol": "EURUSD",
+            "candle_count": 200,
+            "param_ranges": {"fast": {"values": [5]}, "slow": {"values": [30]}},
+        },
+    )
+    run_id = created.json()["id"]
+    fetched = client.get(f"/api/v1/backtests/optimize/{run_id}", headers=auth_headers)
+    assert fetched.status_code == 200, fetched.text
+    assert fetched.json()["id"] == run_id
+
+
+def test_optimize_unknown_strategy_returns_404(client: TestClient, auth_headers: dict) -> None:
+    resp = client.post(
+        "/api/v1/backtests/optimize",
+        headers=auth_headers,
+        json={
+            "strategy": "does_not_exist",
+            "symbol": "EURUSD",
+            "candle_count": 200,
+            "param_ranges": {"fast": {"values": [5]}},
+        },
+    )
+    assert resp.status_code == 404
+
+
+def test_optimize_oversized_grid_returns_400(client: TestClient, auth_headers: dict) -> None:
+    resp = client.post(
+        "/api/v1/backtests/optimize",
+        headers=auth_headers,
+        json={
+            "strategy": "sma_cross",
+            "symbol": "EURUSD",
+            "candle_count": 200,
+            "param_ranges": {
+                "fast": {"values": list(range(1, 30))},
+                "slow": {"values": list(range(31, 60))},
+            },
+        },
+    )
+    assert resp.status_code == 400
+
+
 def test_other_users_cannot_read_others_runs(client: TestClient, auth_headers: dict) -> None:
     created = client.post(
         "/api/v1/backtests",
