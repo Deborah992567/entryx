@@ -29,6 +29,8 @@ class CandleChartPainter extends CustomPainter {
     this.selectedDrawingId,
     this.draft,
     this.lastPrice,
+    this.equitySeries = const [],
+    this.markers = const [],
     this.template = ChartTemplate.dark,
   });
 
@@ -45,6 +47,8 @@ class CandleChartPainter extends CustomPainter {
   final int? selectedDrawingId;
   final models.ChartDrawing? draft;
   final double? lastPrice;
+  final List<double?> equitySeries;
+  final List<models.TradeMarker> markers;
   final ChartTemplate template;
 
   @override
@@ -57,6 +61,7 @@ class CandleChartPainter extends CustomPainter {
       overlays: overlays,
       bands: bands,
       lastPrice: lastPrice,
+      equitySeries: equitySeries,
     );
     if (size.width <= ChartGeometry.priceWidth || size.height <= ChartGeometry.timeHeight) {
       return;
@@ -79,6 +84,11 @@ class CandleChartPainter extends CustomPainter {
     for (final o in overlays) {
       _drawLine(canvas, geo, o.series, _colorForOverlay(o.label));
     }
+
+    if (geo.hasEquityPane) {
+      _drawEquityPane(canvas, geo);
+    }
+    _drawTradeMarkers(canvas, geo);
 
     if (lastPrice != null) {
       _drawLastPriceTag(canvas, geo, lastPrice!);
@@ -121,7 +131,7 @@ class CandleChartPainter extends CustomPainter {
     final barStep = math.max(1, (geo.visibleCount / 6).round());
     for (var i = start; i < end; i += barStep) {
       final x = geo.xForBar(i.toDouble());
-      canvas.drawLine(Offset(x, 0), Offset(x, rect.height), grid);
+      canvas.drawLine(Offset(x, 0), Offset(x, geo.chartHeight), grid);
       _drawText(canvas, _formatTime(candles[i].ts), Offset(x - 14, rect.bottom + 4),
           template.axisText, fontSize: 9.5);
     }
@@ -130,7 +140,7 @@ class CandleChartPainter extends CustomPainter {
   // --------------------------------------------------------------------- volume
 
   void _drawVolume(Canvas canvas, ChartGeometry geo, double maxV) {
-    final rect = Rect.fromLTRB(0, geo.volumeTop, geo.chartWidth, geo.chartHeight);
+    final rect = geo.volumeRect;
     final paint = Paint();
     for (var i = start; i < end; i++) {
       final candle = candles[i];
@@ -144,6 +154,121 @@ class CandleChartPainter extends CustomPainter {
         paint,
       );
     }
+  }
+
+  // --------------------------------------------------------------- equity pane
+
+  void _drawEquityPane(Canvas canvas, ChartGeometry geo) {
+    final min = geo.equityMin;
+    final max = geo.equityMax;
+    if (min == null || max == null) return;
+
+    final edge = Paint()
+      ..color = template.grid.withValues(alpha: 0.7)
+      ..strokeWidth = 0.5;
+    canvas.drawLine(Offset(0, geo.equityTop), Offset(geo.chartWidth, geo.equityTop), edge);
+    canvas.drawLine(Offset(0, geo.equityBottom), Offset(geo.chartWidth, geo.equityBottom), edge);
+
+    final fill = Paint()..color = template.accent.withValues(alpha: 0.12);
+    final line = Paint()
+      ..color = template.accent
+      ..strokeWidth = 1.2
+      ..style = PaintingStyle.stroke;
+
+    final path = Path();
+    final reverse = <Offset>[];
+    var started = false;
+    for (var i = start; i < end && i < equitySeries.length; i++) {
+      final v = equitySeries[i];
+      if (v == null) {
+        started = false;
+        continue;
+      }
+      final x = geo.xForBar(i.toDouble());
+      final y = geo.yForEquity(v);
+      if (!started) {
+        path.moveTo(x, y);
+        started = true;
+      } else {
+        path.lineTo(x, y);
+      }
+      reverse.add(Offset(x, y));
+    }
+    if (started && reverse.isNotEmpty) {
+      final closePath = Path.from(path);
+      closePath.lineTo(reverse.last.dx, geo.equityBottom);
+      closePath.lineTo(reverse.first.dx, geo.equityBottom);
+      closePath.close();
+      canvas.drawPath(closePath, fill);
+      canvas.drawPath(path, line);
+    }
+
+    final decimals = _moneyDecimals(max);
+    _drawText(canvas, 'Equity', Offset(6, geo.equityTop + 2), template.axisText, fontSize: 9);
+    _drawText(
+        canvas,
+        min.toStringAsFixed(decimals),
+        Offset(geo.chartWidth + 4, geo.equityBottom - 9),
+        template.axisText,
+        fontSize: 8.5);
+    _drawText(
+        canvas,
+        max.toStringAsFixed(decimals),
+        Offset(geo.chartWidth + 4, geo.equityTop + 1),
+        template.axisText,
+        fontSize: 8.5);
+  }
+
+  void _drawTradeMarkers(Canvas canvas, ChartGeometry geo) {
+    for (final marker in markers) {
+      if (marker.bar < start || marker.bar >= end) continue;
+      final x = geo.xForBar(marker.bar.toDouble());
+      final y = geo.yForPrice(marker.price);
+      if (marker.kind == models.TradeMarkerKind.entry) {
+        _drawEntryMarker(canvas, x, y, buy: marker.buy);
+      } else {
+        _drawExitMarker(canvas, x, y, buy: marker.buy);
+      }
+    }
+  }
+
+  void _drawEntryMarker(Canvas canvas, double x, double y, {required bool buy}) {
+    final color = buy ? template.up : template.down;
+    final r = 6.0;
+    final path = Path();
+    if (buy) {
+      path.moveTo(x - r, y);
+      path.lineTo(x + r, y);
+      path.lineTo(x, y - r);
+    } else {
+      path.moveTo(x - r, y);
+      path.lineTo(x + r, y);
+      path.lineTo(x, y + r);
+    }
+    path.close();
+    final fill = Paint()..color = color;
+    final stroke = Paint()
+      ..color = const Color(0xFF0E1116)
+      ..strokeWidth = 1;
+    canvas.drawPath(path, stroke);
+    canvas.drawPath(path, fill);
+  }
+
+  void _drawExitMarker(Canvas canvas, double x, double y, {required bool buy}) {
+    final color = buy ? template.up : template.down;
+    final stroke = Paint()
+      ..color = color
+      ..strokeWidth = 1.3
+      ..style = PaintingStyle.stroke;
+    canvas.drawCircle(Offset(x, y), 4.5, stroke);
+    canvas.drawCircle(Offset(x, y), 2.2, Paint()..color = color);
+  }
+
+  int _moneyDecimals(double value) {
+    final abs = value.abs();
+    if (abs >= 1000) return 0;
+    if (abs >= 10) return 1;
+    return 2;
   }
 
   // -------------------------------------------------------------------- candles

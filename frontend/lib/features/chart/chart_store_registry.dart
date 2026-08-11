@@ -28,6 +28,10 @@ class ChartStoreRegistry extends ChangeNotifier {
     return _stores.putIfAbsent(panelId, () => ChartStore(api: _api, ws: _ws));
   }
 
+  /// The first chart store (used to overlay backtest results when the
+  /// workspace hosts one or more charts).
+  ChartStore? get firstChart => _stores.isEmpty ? null : _stores.values.first;
+
   /// Whether the chart at [panelId] is linked to the shared sync group.
   bool isSynced(String panelId) => storeFor(panelId).synced;
 

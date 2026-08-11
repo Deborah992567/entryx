@@ -12,6 +12,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../core/api_client.dart';
 import '../../core/ws_client.dart';
+import '../backtest/backtest_models.dart';
 import 'chart_models.dart';
 import 'chart_template.dart';
 import 'indicator_engine.dart';
@@ -58,6 +59,10 @@ class ChartStore extends ChangeNotifier {
   ChartSyncGroup? _sync;
   bool _disposed = false;
 
+  BacktestResult? _backtest;
+  List<double?> _equitySeries = const [];
+  List<TradeMarker> _backtestMarkers = const [];
+
   static const List<String> _indicatorOrder = ['sma20', 'sma50', 'ema20', 'vwap', 'bollinger'];
   final Map<String, bool> _indicatorEnabled = {
     'sma20': true,
@@ -79,6 +84,9 @@ class ChartStore extends ChangeNotifier {
   bool get followingLatest => _right == -1;
   bool get hasData => _candles.isNotEmpty;
   bool get synced => _sync != null;
+  BacktestResult? get backtest => _backtest;
+  List<double?> get equitySeries => _equitySeries;
+  List<TradeMarker> get backtestMarkers => _backtestMarkers;
 
   /// The right edge (in bar index terms, -1 = follow) shared with synced charts.
   int get syncRight => _right;
@@ -311,6 +319,54 @@ class ChartStore extends ChangeNotifier {
 
   Future<void> refresh() => _load();
 
+  /// Overlays a completed backtest result: its equity curve fills the equity
+  /// pane and each trade is anchored with entry/exit markers by candle
+  /// timestamp (so the overlay lines up regardless of the chart's bar count).
+  void setBacktest(BacktestResult result) {
+    _backtest = result;
+    _mapBacktestOverlay();
+    notifyListeners();
+  }
+
+  void clearBacktest() {
+    _backtest = null;
+    _equitySeries = const [];
+    _backtestMarkers = const [];
+    notifyListeners();
+  }
+
+  void _mapBacktestOverlay() {
+    final result = _backtest;
+    _equitySeries = const [];
+    _backtestMarkers = const [];
+    if (result == null || _candles.isEmpty) return;
+    final indexByTs = <int, int>{};
+    for (var i = 0; i < _candles.length; i++) {
+      indexByTs[_candles[i].ts.toUtc().millisecondsSinceEpoch] = i;
+    }
+    final equity = List<double?>.filled(_candles.length, null);
+    for (final p in result.equityCurve) {
+      final idx = indexByTs[p.ts.toUtc().millisecondsSinceEpoch];
+      if (idx != null) equity[idx] = p.equity;
+    }
+    final markers = <TradeMarker>[];
+    for (final t in result.trades) {
+      final openIdx = indexByTs[DateTime.parse(t.openedAt).toUtc().millisecondsSinceEpoch];
+      final closeIdx = indexByTs[DateTime.parse(t.closedAt).toUtc().millisecondsSinceEpoch];
+      final buy = t.side == 'buy';
+      if (openIdx != null) {
+        markers.add(TradeMarker(
+            bar: openIdx, price: t.openPrice, kind: TradeMarkerKind.entry, buy: buy));
+      }
+      if (closeIdx != null) {
+        markers.add(TradeMarker(
+            bar: closeIdx, price: t.closePrice, kind: TradeMarkerKind.exit, buy: buy));
+      }
+    }
+    _equitySeries = equity;
+    _backtestMarkers = markers;
+  }
+
   @override
   void dispose() {
     _disposed = true;
@@ -333,6 +389,9 @@ class ChartStore extends ChangeNotifier {
     _crosshairPrice = null;
     _candles = const [];
     _error = '';
+    _backtest = null;
+    _equitySeries = const [];
+    _backtestMarkers = const [];
   }
 
   void _subscribeCandleChannel() {

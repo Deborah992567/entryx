@@ -93,6 +93,25 @@ const Map<String, Color> overlayColors = {
   'BB 20,2': Color(0xFF3B9EFF),
 };
 
+/// What a backtest trade marker represents on the chart.
+enum TradeMarkerKind { entry, exit }
+
+/// A backtest trade anchored to a candle bar index for chart plotting.
+class TradeMarker {
+  const TradeMarker({
+    required this.bar,
+    required this.price,
+    required this.kind,
+    required this.buy,
+  });
+
+  /// Bar index into the chart's candle series.
+  final int bar;
+  final double price;
+  final TradeMarkerKind kind;
+  final bool buy;
+}
+
 /// Active drawing tool in the chart panel.
 enum DrawingTool {
   select('Select'),

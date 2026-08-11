@@ -91,6 +91,7 @@ class _ChartPanelState extends State<ChartPanel> {
                 end: store.visibleEnd,
                 overlays: pack.overlays,
                 bands: pack.bands,
+                equitySeries: store.equitySeries,
               );
               final barWidth = geo.barWidth;
 
@@ -136,6 +137,8 @@ class _ChartPanelState extends State<ChartPanel> {
                         drawings: store.drawings,
                         selectedDrawingId: store.selectedDrawingId,
                         draft: _draft,
+                        equitySeries: store.equitySeries,
+                        markers: store.backtestMarkers,
                         template: store.template,
                       ),
                       size: Size(constraints.maxWidth, constraints.maxHeight),
@@ -764,6 +767,23 @@ class _LegendBar extends StatelessWidget {
             if (!store.followingLatest)
               const Text('panned · double-click to reset',
                   style: TextStyle(fontSize: 10, color: EntryXColors.warn)),
+            if (store.backtest != null) ...[
+              const SizedBox(width: 10),
+              InkWell(
+                onTap: store.clearBacktest,
+                child: Row(
+                  children: [
+                    const Icon(Icons.science_outlined,
+                        size: 12, color: EntryXColors.accentBright),
+                    const SizedBox(width: 4),
+                    Text(
+                      'BT ${store.backtest!.strategy} · clear',
+                      style: const TextStyle(fontSize: 10, color: EntryXColors.accentBright),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ],
           const Spacer(),
           for (final key in store.indicatorKeys)

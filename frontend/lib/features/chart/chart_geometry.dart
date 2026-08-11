@@ -17,8 +17,10 @@ class ChartGeometry {
     this.overlays = const [],
     this.bands = const [],
     this.lastPrice,
+    this.equitySeries = const [],
   }) {
     _computeRange();
+    _computeEquityRange();
   }
 
   final Size size;
@@ -29,22 +31,45 @@ class ChartGeometry {
   final List<Bands> bands;
   final double? lastPrice;
 
+  /// Backtest equity values aligned to candle bar indices (null = no data).
+  /// When non-empty, a dedicated equity pane is reserved below the price pane.
+  final List<double?> equitySeries;
+
   static const double priceWidth = 58;
   static const double timeHeight = 20;
   static const double volumeRatio = 0.22;
   static const double pricePadding = 0.06;
+  static const double equityPaneRatio = 0.22;
+  static const double volumePaneRatio = 0.14;
 
   late double minPrice;
   late double maxPrice;
+  double? equityMin;
+  double? equityMax;
 
   double get chartWidth => size.width - priceWidth;
   double get chartHeight => size.height - timeHeight;
-  double get priceBottom => chartHeight * (1 - volumeRatio);
-  double get volumeTop => priceBottom;
+
+  bool get hasEquityPane => equitySeries.isNotEmpty;
+
+  /// Height of the backtest equity pane (0 when no backtest overlay).
+  double get equityHeight => hasEquityPane ? chartHeight * equityPaneRatio : 0.0;
+
+  /// Height of the volume pane (shrinks when the equity pane is shown).
+  double get volumeHeight => hasEquityPane ? chartHeight * volumePaneRatio : chartHeight * volumeRatio;
+
+  /// Bottom edge of the price pane.
+  double get priceBottom => chartHeight - equityHeight - volumeHeight;
+
+  double get volumeTop => priceBottom + equityHeight;
+  double get equityTop => priceBottom;
+  double get equityBottom => volumeTop;
   int get visibleCount => end - start;
   double get barWidth => visibleCount > 0 ? chartWidth / visibleCount : 1.0;
 
   Rect get priceRect => Rect.fromLTRB(0, 0, chartWidth, priceBottom);
+  Rect get equityRect => Rect.fromLTRB(0, equityTop, chartWidth, equityBottom);
+  Rect get volumeRect => Rect.fromLTRB(0, volumeTop, chartWidth, chartHeight);
 
   bool get hasData => candles.isNotEmpty && start < end && minPrice.isFinite;
 
@@ -98,10 +123,38 @@ class ChartGeometry {
     }
   }
 
+  void _computeEquityRange() {
+    var minE = double.infinity;
+    var maxE = double.negativeInfinity;
+    for (var i = start; i < end && i < equitySeries.length; i++) {
+      final v = equitySeries[i];
+      if (v == null) continue;
+      if (v < minE) minE = v;
+      if (v > maxE) maxE = v;
+    }
+    if (!minE.isFinite) {
+      equityMin = null;
+      equityMax = null;
+      return;
+    }
+    final pad = (maxE - minE) * pricePadding;
+    minE -= pad;
+    maxE += pad;
+    if (maxE <= minE) maxE = minE + 1;
+    equityMin = minE;
+    equityMax = maxE;
+  }
+
   double xForBar(double bar) => (bar - start + 0.5) * barWidth;
 
   double yForPrice(double price) =>
       priceBottom - (price - minPrice) / (maxPrice - minPrice) * priceBottom;
+
+  double yForEquity(double value) {
+    final min = equityMin ?? 0.0;
+    final max = equityMax ?? 1.0;
+    return equityBottom - (value - min) / (max - min) * (equityBottom - equityTop);
+  }
 
   double barAtX(double x) => start - 0.5 + x / barWidth;
 
