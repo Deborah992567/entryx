@@ -52,7 +52,7 @@ Legend: `[x]` done · `[~]` in progress · `[ ]` planned
 - [x] Strategy framework: `initialize/on_tick/on_candle/on_signal/on_order/on_position/shutdown`
 - [x] Backtester: bar-by-bar candle replay, commission/spread/slippage/swap/leverage, SL/TP/trailing, equity curve + trades API
 - [x] Metrics: win rate, profit factor, max drawdown (currency + %), Sharpe, expectancy, equity curve
-- [ ] Visual backtest results on chart; parameter optimization with overfit warnings
+- [x] Visual backtest results on chart; parameter optimization with overfit warnings
 
 ## PHASE 6 — Market structure + Smart Money Concepts
 
@@ -104,8 +104,8 @@ Legend: `[x]` done · `[~]` in progress · `[ ]` planned
 | 2 | Market data + paper broker + real-time | done |
 | 3 | Chart engine + indicators + drawings | done |
 | 4 | Trading engine + risk | done |
-| 5 | Strategy + backtesting + optimization | in progress |
-| 6 | Market structure + SMC | planned |
+| 5 | Strategy + backtesting + optimization | done |
+| 6 | Market structure + SMC | in progress |
 | 7 | Local AI infrastructure | planned |
 | 8 | AI applications | planned |
 | 9 | Broker adapters + live safeguards | planned |
