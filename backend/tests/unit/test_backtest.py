@@ -110,6 +110,8 @@ def test_market_order_fills_at_next_bar_open() -> None:
     trade = result["trades"][0]
     assert trade["open_price"] == pytest.approx(series[1].o)  # fill at second bar open
     assert trade["closed_at"] == series[-1].ts.isoformat()
+    assert trade["open_bar"] == 1
+    assert trade["close_bar"] == len(series) - 1
 
 
 def test_equity_curve_has_one_point_per_bar() -> None:

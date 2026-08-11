@@ -68,6 +68,8 @@ class BacktestTradeOut(BaseModel):
     swap: float
     opened_at: datetime
     closed_at: datetime
+    open_bar: int | None = None
+    close_bar: int | None = None
     magic: int = 0
 
 

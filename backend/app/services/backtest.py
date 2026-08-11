@@ -1,4 +1,4 @@
-"""UI-independent backtester (Phase 5 line 2).
+"""UI-independent backtester (Phase 5 line 2, bar indices added in line 4).
 
 Replays a historical candle series bar-by-bar through the same strategy
 lifecycle used live (`StrategyRunner`), filling orders against a
@@ -538,7 +538,15 @@ class BacktestBroker:
 # ---------------------------------------------------------------------------
 
 
-def trade_to_dict(trade: ClosedTrade, broker: BacktestBroker) -> dict:
+def trade_to_dict(trade: ClosedTrade, broker: BacktestBroker, bar_indexes: dict[str, int] | None = None) -> dict:
+    """Serialize a closed trade, including candle bar indices for chart plotting.
+
+    ``bar_indexes`` maps candle timestamps (ISO strings) to their position in
+    the replayed series, so the frontend can anchor entry/exit markers to the
+    chart without re-matching timestamps. Falls back to ``None`` for trades
+    whose timestamps are not in the series.
+    """
+    opened_ts = (broker.trade_opened_at(trade.id) or trade.closed_at).isoformat()
     return {
         "id": trade.id,
         "symbol": trade.symbol,
@@ -550,8 +558,10 @@ def trade_to_dict(trade: ClosedTrade, broker: BacktestBroker) -> dict:
         "net_pnl": trade.net_pnl,
         "commission": trade.commission,
         "swap": trade.swap,
-        "opened_at": (broker.trade_opened_at(trade.id) or trade.closed_at).isoformat(),
+        "opened_at": opened_ts,
         "closed_at": trade.closed_at.isoformat(),
+        "open_bar": bar_indexes.get(opened_ts) if bar_indexes else None,
+        "close_bar": bar_indexes.get(trade.closed_at.isoformat()) if bar_indexes else None,
         "magic": broker._position_magic.get(trade.id, 0),
     }
 
@@ -614,7 +624,8 @@ def run_backtest(
         broker.close_position(position.id, at=last.ts)
 
     summary = runner.stop()
-    trades = [trade_to_dict(t, broker) for t in broker.closed_trades()]
+    bar_indexes = {candle.ts.isoformat(): i for i, candle in enumerate(candles)}
+    trades = [trade_to_dict(t, broker, bar_indexes) for t in broker.closed_trades()]
     metrics = compute_metrics(
         trades,
         curve,
