@@ -8,7 +8,7 @@ library;
 
 enum DockOrientation { horizontal, vertical }
 
-enum PanelType { marketWatch, chart, aiCopilot, terminal, journal, alerts, positions, history }
+enum PanelType { marketWatch, chart, aiCopilot, terminal, backtest, journal, alerts, positions, history }
 
 extension PanelTypeInfo on PanelType {
   String get id => name;
@@ -17,6 +17,7 @@ extension PanelTypeInfo on PanelType {
         PanelType.chart => 'Chart',
         PanelType.aiCopilot => 'AI Copilot',
         PanelType.terminal => 'Trading Terminal',
+        PanelType.backtest => 'Backtest',
         PanelType.journal => 'Journal',
         PanelType.alerts => 'Alerts',
         PanelType.positions => 'Positions',

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../shell/workspace/dock_layout.dart';
 import 'ai_copilot_panel.dart';
+import 'backtest_panel.dart';
 import 'chart_panel.dart';
 import 'market_watch_panel.dart';
 import 'trading_terminal_panel.dart';
@@ -15,6 +16,7 @@ Widget buildPanel(PanelType type, {required String panelId}) {
     PanelType.chart => ChartPanel(storeKey: panelId),
     PanelType.aiCopilot => const AiCopilotPanel(),
     PanelType.terminal => const TradingTerminalPanel(),
+    PanelType.backtest => const BacktestPanel(),
     PanelType.journal => _NotBuiltPanel(title: 'Journal'),
     PanelType.alerts => _NotBuiltPanel(title: 'Alerts'),
     PanelType.positions => _NotBuiltPanel(title: 'Positions'),
