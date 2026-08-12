@@ -159,3 +159,157 @@ def classify_structure(candles: list[Candle], swings: list[StructureObject] | No
             prev_low = labeled
             out.append(labeled)
     return out
+
+
+# ---------------------------------------------------------------------------
+# Regime helper shared by BOS / CHoCH
+# ---------------------------------------------------------------------------
+
+
+def _regime_from(last_high: StructureObject | None, last_low: StructureObject | None) -> str:
+    """Trend context from the two most recent swing labels."""
+    if last_high is None or last_low is None:
+        return "range"
+    if last_high.kind == "hh" and last_low.kind == "hl":
+        return "uptrend"
+    if last_high.kind == "lh" and last_low.kind == "ll":
+        return "downtrend"
+    return "range"
+
+
+def _break_strength(candles: list[Candle], bar_index: int, level: float, *, lookback: int = LOOKBACK) -> float:
+    """0..1 closeness of a break relative to recent average candle range."""
+    lo = max(0, bar_index - lookback)
+    window = candles[lo:bar_index]
+    if not window:
+        return 1.0
+    avg = sum(max(c.h - c.low, 1e-9) for c in window) / len(window)
+    return min(1.0, abs(candles[bar_index].c - level) / avg)
+
+
+def detect_bos(candles: list[Candle], structure: list[StructureObject] | None = None) -> list[StructureObject]:
+    """Break of Structure — close beyond the last swing in the prevailing trend.
+
+    In an uptrend a close that crosses above the most recent confirmed swing
+    high is a bullish BOS (trend continuation); in a downtrend a close below
+    the most recent confirmed swing low is a bearish BOS. Only true crossings
+    count, so a level fires at most once.
+    """
+    structure = structure or classify_structure(candles)
+    out: list[StructureObject] = []
+    last_high: StructureObject | None = None
+    last_low: StructureObject | None = None
+    ptr = 0
+    for i in range(1, len(candles)):
+        while ptr < len(structure) and structure[ptr].bar_index <= i:
+            swing = structure[ptr]
+            if swing.kind in {"swing_high", "hh", "lh"}:
+                last_high = swing
+            elif swing.kind in {"swing_low", "hl", "ll"}:
+                last_low = swing
+            ptr += 1
+        context = _regime_from(last_high, last_low)
+        bar = candles[i]
+        if context == "uptrend" and last_high is not None:
+            if candles[i - 1].c <= last_high.price < bar.c:
+                out.append(
+                    StructureObject(
+                        kind="bos",
+                        bar_index=i,
+                        ts=bar.ts,
+                        price=bar.c,
+                        timeframe=bar.timeframe,
+                        direction="bullish",
+                        strength=_break_strength(candles, i, last_high.price),
+                        invalidation_price=last_high.price,
+                        meta={
+                            "broken": last_high.kind,
+                            "broken_price": last_high.price,
+                            "broken_bar": last_high.bar_index,
+                        },
+                    )
+                )
+        elif context == "downtrend" and last_low is not None:
+            if candles[i - 1].c >= last_low.price > bar.c:
+                out.append(
+                    StructureObject(
+                        kind="bos",
+                        bar_index=i,
+                        ts=bar.ts,
+                        price=bar.c,
+                        timeframe=bar.timeframe,
+                        direction="bearish",
+                        strength=_break_strength(candles, i, last_low.price),
+                        invalidation_price=last_low.price,
+                        meta={
+                            "broken": last_low.kind,
+                            "broken_price": last_low.price,
+                            "broken_bar": last_low.bar_index,
+                        },
+                    )
+                )
+    return out
+
+
+def detect_choch(candles: list[Candle], structure: list[StructureObject] | None = None) -> list[StructureObject]:
+    """Change of Character — close against the prevailing trend's structure.
+
+    In an uptrend a close that crosses below the most recent confirmed swing
+    low (turning the HH/HL sequence) is a bearish CHoCH; in a downtrend a close
+    above the most recent confirmed swing high is a bullish CHoCH. Unlike BOS,
+    CHoCH breaks the *counter* level and signals a possible trend change.
+    """
+    structure = structure or classify_structure(candles)
+    out: list[StructureObject] = []
+    last_high: StructureObject | None = None
+    last_low: StructureObject | None = None
+    ptr = 0
+    for i in range(1, len(candles)):
+        while ptr < len(structure) and structure[ptr].bar_index <= i:
+            swing = structure[ptr]
+            if swing.kind in {"swing_high", "hh", "lh"}:
+                last_high = swing
+            elif swing.kind in {"swing_low", "hl", "ll"}:
+                last_low = swing
+            ptr += 1
+        context = _regime_from(last_high, last_low)
+        bar = candles[i]
+        if context == "uptrend" and last_low is not None:
+            if candles[i - 1].c >= last_low.price > bar.c:
+                out.append(
+                    StructureObject(
+                        kind="choch",
+                        bar_index=i,
+                        ts=bar.ts,
+                        price=bar.c,
+                        timeframe=bar.timeframe,
+                        direction="bearish",
+                        strength=_break_strength(candles, i, last_low.price),
+                        invalidation_price=last_low.price,
+                        meta={
+                            "broken": last_low.kind,
+                            "broken_price": last_low.price,
+                            "broken_bar": last_low.bar_index,
+                        },
+                    )
+                )
+        elif context == "downtrend" and last_high is not None:
+            if candles[i - 1].c <= last_high.price < bar.c:
+                out.append(
+                    StructureObject(
+                        kind="choch",
+                        bar_index=i,
+                        ts=bar.ts,
+                        price=bar.c,
+                        timeframe=bar.timeframe,
+                        direction="bullish",
+                        strength=_break_strength(candles, i, last_high.price),
+                        invalidation_price=last_high.price,
+                        meta={
+                            "broken": last_high.kind,
+                            "broken_price": last_high.price,
+                            "broken_bar": last_high.bar_index,
+                        },
+                    )
+                )
+    return out
