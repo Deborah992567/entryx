@@ -55,5 +55,7 @@ entryx/
 
 ## Development status
 
-Phase 1 (architecture, auth, database, desktop shell, workspace system) is the current focus.
+Phase 6 (market structure + Smart Money Concepts) is the current focus; the
+deterministic structure detectors (swings, HH/HL/LH/LL, BOS, CHoCH,
+trend/range, breakout/retest) are complete.
 See [docs/ROADMAP.md](docs/ROADMAP.md) for the phased build order and status.
