@@ -8,21 +8,21 @@ import pytest
 from app.services.market_data import Candle
 from app.services.market_structure import (
     StructureObject,
+    analyze,
     classify_structure,
     detect_bos,
     detect_breakouts_and_retests,
     detect_choch,
     detect_regime_changes,
     detect_swings,
-    analyze,
 )
 
 
 def candles(points: list[tuple[float, float, float, float]], symbol: str = "EURUSD") -> list[Candle]:
     start = datetime(2024, 1, 1, tzinfo=UTC)
     return [
-        Candle(symbol=symbol, timeframe="H1", ts=start + timedelta(hours=i), o=o, h=h, low=l, c=c, v=100.0)
-        for i, (o, h, l, c) in enumerate(points)
+        Candle(symbol=symbol, timeframe="H1", ts=start + timedelta(hours=i), o=o, h=h, low=lo, c=c, v=100.0)
+        for i, (o, h, lo, c) in enumerate(points)
     ]
 
 
