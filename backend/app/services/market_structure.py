@@ -313,3 +313,179 @@ def detect_choch(candles: list[Candle], structure: list[StructureObject] | None 
                     )
                 )
     return out
+
+
+# ---------------------------------------------------------------------------
+# Regime (trend / range)
+# ---------------------------------------------------------------------------
+
+
+def _regime_at(bar_index: int, structure: list[StructureObject], *, window: int = REGIME_WINDOW) -> str:
+    """Majority vote over the last ``window`` labels confirmed at ``bar_index``."""
+    recent = [s for s in structure if s.bar_index <= bar_index][-window:]
+    bull = sum(1 for s in recent if s.kind in {"hh", "hl"})
+    bear = sum(1 for s in recent if s.kind in {"lh", "ll"})
+    if bull >= 2 and bull > bear:
+        return "uptrend"
+    if bear >= 2 and bear > bull:
+        return "downtrend"
+    return "range"
+
+
+def detect_regime_changes(candles: list[Candle], structure: list[StructureObject] | None = None, *, window: int = REGIME_WINDOW) -> list[StructureObject]:
+    """Emit a ``regime`` object every time the trend/range regime flips."""
+    structure = structure or classify_structure(candles)
+    out: list[StructureObject] = []
+    previous = "range"
+    for i, bar in enumerate(candles):
+        regime = _regime_at(i, structure, window=window)
+        if regime != previous:
+            out.append(
+                StructureObject(
+                    kind="regime",
+                    bar_index=i,
+                    ts=bar.ts,
+                    price=bar.c,
+                    timeframe=bar.timeframe,
+                    direction=regime,
+                    status="active",
+                    meta={"from": previous},
+                )
+            )
+            previous = regime
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Breakout + retest
+# ---------------------------------------------------------------------------
+
+
+def detect_breakouts_and_retests(
+    candles: list[Candle],
+    structure: list[StructureObject] | None = None,
+    *,
+    min_bars: int = BREAKOUT_MIN_BARS,
+) -> tuple[list[StructureObject], list[StructureObject]]:
+    """Breakout of an established level + the retest that validates or kills it.
+
+    A breakout requires a confirmed swing level that has survived ``min_bars``
+    candles before a close crosses it. While a breakout is live, a later candle
+    that wicks back to the level but closes on the breakout side is a retest;
+    a close back through the level invalidates the breakout (nothing further is
+    emitted). Returns ``(breakouts, retests)``.
+    """
+    structure = structure or classify_structure(candles)
+    breakouts: list[StructureObject] = []
+    retests: list[StructureObject] = []
+    last_high: StructureObject | None = None
+    last_low: StructureObject | None = None
+    active: tuple[str, float, int] | None = None  # (direction, level, breakout_bar)
+    ptr = 0
+    for i in range(1, len(candles)):
+        while ptr < len(structure) and structure[ptr].bar_index <= i - min_bars:
+            swing = structure[ptr]
+            if swing.kind in {"swing_high", "hh", "lh"}:
+                last_high = swing
+            elif swing.kind in {"swing_low", "hl", "ll"}:
+                last_low = swing
+            ptr += 1
+
+        bar = candles[i]
+        if active is not None:
+            direction, level, breakout_bar = active
+            if direction == "bullish":
+                if bar.c < level:
+                    active = None
+                elif bar.low <= level < bar.c and i > breakout_bar:
+                    retests.append(
+                        StructureObject(
+                            kind="retest",
+                            bar_index=i,
+                            ts=bar.ts,
+                            price=level,
+                            timeframe=bar.timeframe,
+                            direction="bullish",
+                            status="confirmed",
+                            strength=_break_strength(candles, i, level),
+                            invalidation_price=level,
+                            meta={"breakout_bar": breakout_bar},
+                        )
+                    )
+            else:
+                if bar.c > level:
+                    active = None
+                elif bar.h >= level > bar.c and i > breakout_bar:
+                    retests.append(
+                        StructureObject(
+                            kind="retest",
+                            bar_index=i,
+                            ts=bar.ts,
+                            price=level,
+                            timeframe=bar.timeframe,
+                            direction="bearish",
+                            status="confirmed",
+                            strength=_break_strength(candles, i, level),
+                            invalidation_price=level,
+                            meta={"breakout_bar": breakout_bar},
+                        )
+                    )
+
+        if last_high is not None and candles[i - 1].c <= last_high.price < bar.c:
+            breakouts.append(
+                StructureObject(
+                    kind="breakout",
+                    bar_index=i,
+                    ts=bar.ts,
+                    price=bar.c,
+                    timeframe=bar.timeframe,
+                    direction="bullish",
+                    strength=_break_strength(candles, i, last_high.price),
+                    invalidation_price=last_high.price,
+                    meta={"broken": last_high.kind, "broken_price": last_high.price, "broken_bar": last_high.bar_index},
+                )
+            )
+            active = ("bullish", last_high.price, i)
+        elif last_low is not None and candles[i - 1].c >= last_low.price > bar.c:
+            breakouts.append(
+                StructureObject(
+                    kind="breakout",
+                    bar_index=i,
+                    ts=bar.ts,
+                    price=bar.c,
+                    timeframe=bar.timeframe,
+                    direction="bearish",
+                    strength=_break_strength(candles, i, last_low.price),
+                    invalidation_price=last_low.price,
+                    meta={"broken": last_low.kind, "broken_price": last_low.price, "broken_bar": last_low.bar_index},
+                )
+            )
+            active = ("bearish", last_low.price, i)
+    return breakouts, retests
+
+
+# ---------------------------------------------------------------------------
+# Orchestration
+# ---------------------------------------------------------------------------
+
+
+def analyze(candles: list[Candle], *, left: int = SWING_LEFT, right: int = SWING_RIGHT, window: int = REGIME_WINDOW, min_bars: int = BREAKOUT_MIN_BARS) -> dict:
+    """Run every detector over ``candles`` and return a serializable summary."""
+    if not candles:
+        return {"symbol": "", "timeframe": "", "candles": 0, "left": left, "right": right, "swings": [], "bos": [], "choch": [], "regimes": [], "breakouts": [], "retests": []}
+    swings = detect_swings(candles, left=left, right=right)
+    structure = classify_structure(candles, swings)
+    breakouts, retests = detect_breakouts_and_retests(candles, structure, min_bars=min_bars)
+    return {
+        "symbol": candles[0].symbol,
+        "timeframe": candles[0].timeframe,
+        "candles": len(candles),
+        "left": left,
+        "right": right,
+        "swings": [structure_to_dict(s) for s in structure],
+        "bos": [structure_to_dict(s) for s in detect_bos(candles, structure)],
+        "choch": [structure_to_dict(s) for s in detect_choch(candles, structure)],
+        "regimes": [structure_to_dict(s) for s in detect_regime_changes(candles, structure, window=window)],
+        "breakouts": [structure_to_dict(s) for s in breakouts],
+        "retests": [structure_to_dict(s) for s in retests],
+    }
