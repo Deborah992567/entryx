@@ -18,6 +18,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 
 from app.services.market_data import Candle
+from app.services.market_structure import StructureObject, classify_structure
 
 # Default lookback used to measure "average" candle range for strength scoring.
 ATR_LOOKBACK = 20
@@ -188,4 +189,115 @@ def detect_displacement(candles: list[Candle], *, lookback: int = ATR_LOOKBACK, 
                 meta={"range": span, "body": body},
             )
         )
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Liquidity pools (EQH / EQL) + sweeps
+# ---------------------------------------------------------------------------
+
+
+def detect_liquidity_pools(candles: list[Candle], structure: list[StructureObject] | None = None, *, tolerance: float = LIQUIDITY_TOLERANCE, min_touches: int = LIQUIDITY_MIN_TOUCHES) -> list[SmcObject]:
+    """Group near-equal swings into EQH (equal highs) / EQL (equal lows) pools.
+
+    Consecutive swing highs within ``tolerance`` of each other cluster into one
+    equal-high pool (resting sell liquidity above); consecutive swing lows into
+    an equal-low pool (buy liquidity below). Pools with fewer than
+    ``min_touches`` touches are noise and are dropped. The pool's ``range`` is
+    the band between its extreme touches.
+    """
+    structure = structure or classify_structure(candles)
+    highs = [s for s in structure if s.kind in {"swing_high", "hh", "lh"}]
+    lows = [s for s in structure if s.kind in {"swing_low", "hl", "ll"}]
+    pools = [*_group_pools(candles, highs, "eqh", tolerance, min_touches), *_group_pools(candles, lows, "eql", tolerance, min_touches)]
+    pools.sort(key=lambda p: (p.bar_index, p.kind))
+    return pools
+
+
+def _group_pools(candles: list[Candle], swings: list[StructureObject], kind: str, tolerance: float, min_touches: int) -> list[SmcObject]:
+    out: list[SmcObject] = []
+    group: list[StructureObject] = []
+    for swing in swings:
+        if not group or abs(swing.price - group[0].price) / max(abs(group[0].price), 1e-12) <= tolerance:
+            group.append(swing)
+            continue
+        if len(group) >= min_touches:
+            out.append(_pool_object(candles, group, kind))
+        group = [swing]
+    if len(group) >= min_touches:
+        out.append(_pool_object(candles, group, kind))
+    return out
+
+
+def _pool_object(candles: list[Candle], group: list[StructureObject], kind: str) -> SmcObject:
+    low = min(s.price for s in group)
+    high = max(s.price for s in group)
+    last = group[-1]
+    touches = [s.bar_index for s in group]
+    if kind == "eqh":
+        direction, invalidation = "bearish", low  # sell liquidity rests above; below low voids the pool
+    else:
+        direction, invalidation = "bullish", high
+    return SmcObject(
+        kind=kind,
+        bar_index=last.bar_index,
+        ts=last.ts,
+        timeframe=last.timeframe,
+        direction=direction,
+        range_low=low,
+        range_high=high,
+        strength=min(1.0, len(group) / 3.0),
+        invalidation_price=invalidation,
+        meta={"touches": touches, "touch_prices": [s.price for s in group]},
+    )
+
+
+def detect_sweeps(candles: list[Candle], pools: list[SmcObject] | None = None, *, lookback: int = ATR_LOOKBACK) -> list[SmcObject]:
+    """Liquidity grabs: pierce a pool boundary, then close back inside.
+
+    A sell-side sweep pierces above an EQH pool (taking the resting stops) and
+    closes back under its high; a buy-side sweep pierces below an EQL pool and
+    closes back above its low. Each pool is monitored until its first pierce —
+    a close beyond the boundary is a real breakout, not a sweep.
+    """
+    pools = pools or detect_liquidity_pools(candles)
+    out: list[SmcObject] = []
+    for pool in pools:
+        for i in range(pool.bar_index + 1, len(candles)):
+            bar = candles[i]
+            if pool.kind == "eqh" and bar.h > pool.range_high:
+                if bar.c < pool.range_high:
+                    out.append(
+                        SmcObject(
+                            kind="sweep",
+                            bar_index=i,
+                            ts=bar.ts,
+                            timeframe=bar.timeframe,
+                            direction="bearish",
+                            range_low=pool.range_high,
+                            range_high=bar.h,
+                            strength=_strength_vs_range(candles, i, bar.h - pool.range_high, lookback=lookback),
+                            invalidation_price=pool.range_low,
+                            meta={"pool_kind": "eqh", "pool_bar": pool.bar_index},
+                        )
+                    )
+                break
+            if pool.kind == "eql" and bar.low < pool.range_low:
+                if bar.c > pool.range_low:
+                    out.append(
+                        SmcObject(
+                            kind="sweep",
+                            bar_index=i,
+                            ts=bar.ts,
+                            timeframe=bar.timeframe,
+                            direction="bullish",
+                            range_low=bar.low,
+                            range_high=pool.range_low,
+                            strength=_strength_vs_range(candles, i, pool.range_low - bar.low, lookback=lookback),
+                            invalidation_price=pool.range_high,
+                            meta={"pool_kind": "eql", "pool_bar": pool.bar_index},
+                        )
+                    )
+                break
+    out.sort(key=lambda s: s.bar_index)
     return out
