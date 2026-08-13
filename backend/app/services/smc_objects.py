@@ -301,3 +301,132 @@ def detect_sweeps(candles: list[Candle], pools: list[SmcObject] | None = None, *
                 break
     out.sort(key=lambda s: s.bar_index)
     return out
+
+
+# ---------------------------------------------------------------------------
+# Order blocks + breaker blocks
+# ---------------------------------------------------------------------------
+
+
+def detect_order_blocks(candles: list[Candle], displacement: list[SmcObject] | None = None, *, lookback: int = 5) -> list[SmcObject]:
+    """Last opposite candle before a displacement that ignites a move.
+
+    For each bullish displacement the order block is the most recent bearish
+    candle in the ``lookback`` bars before it (where institutional buying
+    reversed selling); the mirror holds for bearish displacements. Blocks are
+    deduplicated by origin candle. A block is later marked ``invalidated`` once
+    price closes beyond its far boundary.
+    """
+    displacement = displacement or detect_displacement(candles)
+    candidates: dict[tuple[int, str], SmcObject] = {}
+    for displ in displacement:
+        direction = displ.direction
+        origin = _last_opposite_candle(candles, displ.bar_index, direction, lookback)
+        if origin is None:
+            continue
+        bar = candles[origin]
+        if direction == "bullish":
+            invalidation = bar.low
+        else:
+            invalidation = bar.h
+        key = (origin, direction)
+        if key not in candidates or displ.strength > candidates[key].strength:
+            candidates[key] = SmcObject(
+                kind="order_block",
+                bar_index=origin,
+                ts=bar.ts,
+                timeframe=bar.timeframe,
+                direction=direction,
+                range_low=bar.low,
+                range_high=bar.h,
+                strength=displ.strength,
+                invalidation_price=invalidation,
+                meta={"displacement_bar": displ.bar_index, "body": bar.c - bar.o},
+            )
+    out = sorted(candidates.values(), key=lambda o: o.bar_index)
+    return [_mark_order_block_status(candles, block) for block in out]
+
+
+def _last_opposite_candle(candles: list[Candle], until: int, direction: str, lookback: int) -> int | None:
+    """Index of the most recent candle before ``until`` with opposite direction."""
+    for i in range(until - 1, max(-1, until - lookback - 1), -1):
+        bar = candles[i]
+        if direction == "bullish" and bar.c < bar.o:
+            return i
+        if direction == "bearish" and bar.c > bar.o:
+            return i
+    return None
+
+
+def _mark_order_block_status(candles: list[Candle], block: SmcObject) -> SmcObject:
+    """Invalidate a block once a close breaches its far boundary."""
+    for bar in candles[block.bar_index + 1 :]:
+        if block.direction == "bullish" and bar.c < block.invalidation_price:
+            return _replaced(block, status="invalidated", meta={**block.meta, "invalidated_bar": bar_index_of(candles, bar)})
+        if block.direction == "bearish" and bar.c > block.invalidation_price:
+            return _replaced(block, status="invalidated", meta={**block.meta, "invalidated_bar": bar_index_of(candles, bar)})
+    return block
+
+
+def bar_index_of(candles: list[Candle], target: Candle) -> int:
+    """Index of a candle within the series (identity-based; series are small)."""
+    for i, bar in enumerate(candles):
+        if bar is target:
+            return i
+    raise ValueError("candle not in series")
+
+
+def detect_breaker_blocks(candles: list[Candle], order_blocks: list[SmcObject] | None = None) -> list[SmcObject]:
+    """Swept order blocks that get reclaimed and become fresh levels.
+
+    When an order block's far boundary is closed through (the block is
+    ``invalidated``) and price then re-closes back beyond the opposite boundary,
+    the block is repurposed as a breaker block — a reversal magnet where the
+    old institutional orders now stand on the other side.
+    """
+    order_blocks = order_blocks or detect_order_blocks(candles)
+    out: list[SmcObject] = []
+    for block in order_blocks:
+        if block.status != "invalidated":
+            continue
+        invalidated_bar = block.meta.get("invalidated_bar")
+        if not isinstance(invalidated_bar, int):
+            continue
+        far = block.invalidation_price
+        near = block.range_high if block.direction == "bullish" else block.range_low
+        for i in range(invalidated_bar + 1, len(candles)):
+            bar = candles[i]
+            if block.direction == "bullish" and bar.c > near:
+                out.append(
+                    SmcObject(
+                        kind="breaker_block",
+                        bar_index=i,
+                        ts=bar.ts,
+                        timeframe=bar.timeframe,
+                        direction="bullish",
+                        range_low=block.range_low,
+                        range_high=block.range_high,
+                        strength=block.strength,
+                        invalidation_price=far,
+                        meta={"source_order_block": block.bar_index, "swept_at": invalidated_bar},
+                    )
+                )
+                break
+            if block.direction == "bearish" and bar.c < near:
+                out.append(
+                    SmcObject(
+                        kind="breaker_block",
+                        bar_index=i,
+                        ts=bar.ts,
+                        timeframe=bar.timeframe,
+                        direction="bearish",
+                        range_low=block.range_low,
+                        range_high=block.range_high,
+                        strength=block.strength,
+                        invalidation_price=far,
+                        meta={"source_order_block": block.bar_index, "swept_at": invalidated_bar},
+                    )
+                )
+                break
+    out.sort(key=lambda o: o.bar_index)
+    return out
