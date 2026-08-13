@@ -430,3 +430,74 @@ def detect_breaker_blocks(candles: list[Candle], order_blocks: list[SmcObject] |
                 break
     out.sort(key=lambda o: o.bar_index)
     return out
+
+
+# ---------------------------------------------------------------------------
+# Premium / discount dealing zones
+# ---------------------------------------------------------------------------
+
+
+def detect_premium_discount(candles: list[Candle], structure: list[StructureObject] | None = None) -> list[SmcObject]:
+    """Split the current dealing range into premium and discount halves.
+
+    The dealing range is the band between the most recent confirmed swing high
+    and swing low. Below the midpoint is ``discount`` (where buying is
+    favourable); above it is ``premium`` (where selling is favourable). Two zone
+    objects are emitted at the later of the two anchor swings.
+    """
+    structure = structure or classify_structure(candles)
+    highs = [s for s in structure if s.kind in {"swing_high", "hh", "lh"}]
+    lows = [s for s in structure if s.kind in {"swing_low", "hl", "ll"}]
+    if not highs or not lows:
+        return []
+    sh, sl = highs[-1], lows[-1]
+    lo = min(sh.price, sl.price)
+    hi = max(sh.price, sl.price)
+    mid = (lo + hi) / 2.0
+    anchor = sh if sh.bar_index >= sl.bar_index else sl
+    common = {
+        "timeframe": anchor.timeframe,
+        "ts": anchor.ts,
+        "bar_index": anchor.bar_index,
+        "strength": 1.0,
+        "invalidation_price": mid,
+        "meta": {"dealing_range_low": lo, "dealing_range_high": hi, "midpoint": mid, "swing_high_bar": sh.bar_index, "swing_low_bar": sl.bar_index},
+    }
+    return [
+        SmcObject(kind="discount", direction="bullish", range_low=lo, range_high=mid, **common),
+        SmcObject(kind="premium", direction="bearish", range_low=mid, range_high=hi, **common),
+    ]
+
+
+# ---------------------------------------------------------------------------
+# Orchestration
+# ---------------------------------------------------------------------------
+
+
+def analyze_smc(
+    candles: list[Candle],
+    *,
+    lookback: int = ATR_LOOKBACK,
+    mult: float = DISPLACEMENT_MULT,
+    tolerance: float = LIQUIDITY_TOLERANCE,
+    min_touches: int = LIQUIDITY_MIN_TOUCHES,
+) -> dict:
+    """Run every SMC object detector and return a serializable summary."""
+    if not candles:
+        return {"symbol": "", "timeframe": "", "candles": 0, "fvg": [], "displacement": [], "liquidity_pools": [], "sweeps": [], "order_blocks": [], "breaker_blocks": [], "premium_discount": []}
+    structure = classify_structure(candles)
+    displacement = detect_displacement(candles, lookback=lookback, mult=mult)
+    pools = detect_liquidity_pools(candles, structure, tolerance=tolerance, min_touches=min_touches)
+    order_blocks = detect_order_blocks(candles, displacement)
+    return {
+        "symbol": candles[0].symbol,
+        "timeframe": candles[0].timeframe,
+        "candles": len(candles),
+        "fvg": [smc_to_dict(o) for o in detect_fvg(candles, lookback=lookback)],
+        "displacement": [smc_to_dict(o) for o in displacement],
+        "liquidity_pools": [smc_to_dict(o) for o in pools],
+        "sweeps": [smc_to_dict(o) for o in detect_sweeps(candles, pools, lookback=lookback)],
+        "order_blocks": [smc_to_dict(o) for o in order_blocks],
+        "breaker_blocks": [smc_to_dict(o) for o in detect_breaker_blocks(candles, order_blocks)],
+        "premium_discount": [smc_to_dict(o) for o in detect_premium_discount(candles, structure)],
+    }
