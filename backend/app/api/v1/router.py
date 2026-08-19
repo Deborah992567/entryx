@@ -9,6 +9,7 @@ from app.api.v1 import (
     backtests,
     health,
     market,
+    smc,
     strategies,
     structure,
     trading,
@@ -25,4 +26,5 @@ api_router.include_router(trading.router)
 api_router.include_router(strategies.router)
 api_router.include_router(backtests.router)
 api_router.include_router(structure.router)
+api_router.include_router(smc.router)
 api_router.include_router(health.router)
