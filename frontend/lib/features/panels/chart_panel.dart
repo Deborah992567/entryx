@@ -140,6 +140,7 @@ class _ChartPanelState extends State<ChartPanel> {
                         equitySeries: store.equitySeries,
                         markers: store.backtestMarkers,
                         template: store.template,
+                        smc: store.smcEnabled ? store.smc : null,
                       ),
                       size: Size(constraints.maxWidth, constraints.maxHeight),
                     ),
@@ -468,6 +469,8 @@ class _Toolbar extends StatelessWidget {
           ),
           _IndicatorMenu(store: store),
           const SizedBox(width: 6),
+          _SmcToggle(store: store),
+          const SizedBox(width: 6),
           _TemplateMenu(template: store.template, onSelected: onTemplateSelected),
           const SizedBox(width: 6),
           IconButton(
@@ -711,6 +714,61 @@ class _TemplateMenu extends StatelessWidget {
   }
 }
 
+class _SmcToggle extends StatelessWidget {
+  const _SmcToggle({required this.store});
+
+  final ChartStore store;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: store.smcEnabled ? 'Hide SMC structures' : 'Show SMC structures',
+      child: InkWell(
+        onTap: store.toggleSmc,
+        borderRadius: BorderRadius.circular(4),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          decoration: BoxDecoration(
+            color: store.smcEnabled
+                ? EntryXColors.accentBright.withValues(alpha: 0.25)
+                : null,
+            borderRadius: BorderRadius.circular(4),
+            border: Border.all(
+              color: store.smcEnabled
+                  ? EntryXColors.accentBright
+                  : EntryXColors.border,
+              width: 0.5,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.account_tree_outlined,
+                size: 13,
+                color: store.smcEnabled
+                    ? EntryXColors.accentBright
+                    : EntryXColors.textDim,
+              ),
+              const SizedBox(width: 3),
+              Text(
+                'SMC',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  color: store.smcEnabled
+                      ? EntryXColors.accentBright
+                      : EntryXColors.textDim,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _LegendBar extends StatelessWidget {
   const _LegendBar({required this.store, required this.watch});
 
@@ -795,6 +853,14 @@ class _LegendBar extends StatelessWidget {
                   style: TextStyle(fontSize: 10, color: overlayColors[_IndicatorMenu.labels[key]]),
                 ),
               ),
+          if (store.smcEnabled)
+            const Padding(
+              padding: EdgeInsets.only(left: 8),
+              child: Text(
+                'SMC',
+                style: TextStyle(fontSize: 10, color: EntryXColors.accentBright),
+              ),
+            ),
         ],
       ),
     );
