@@ -115,13 +115,13 @@ class AIService:
             return "No candle data available."
 
         last = candles[-1]
-        parts.append(f"Latest candle: O={last['o']} H={last['h']} L={last['l']} C={last['c']} V={last['v']}")
+        parts.append(f"Latest candle: O={last.o} H={last.h} L={last.low} C={last.c} V={last.v}")
 
-        highs = [c["h"] for c in candles[-20:]]
-        lows = [c["l"] for c in candles[-20:]]
+        highs = [c.h for c in candles[-20:]]
+        lows = [c.low for c in candles[-20:]]
         parts.append(f"20-bar range: {min(lows):.5f} – {max(highs):.5f}")
 
-        closes = [c["c"] for c in candles[-50:]]
+        closes = [c.c for c in candles[-50:]]
         if len(closes) >= 20:
             sma20 = sum(closes[-20:]) / 20
             parts.append(f"SMA 20: {sma20:.5f}")
