@@ -63,6 +63,9 @@ class ChartStore extends ChangeNotifier {
   List<double?> _equitySeries = const [];
   List<TradeMarker> _backtestMarkers = const [];
 
+  SmcAnalysisResult? _smc;
+  bool _smcEnabled = false;
+
   static const List<String> _indicatorOrder = ['sma20', 'sma50', 'ema20', 'vwap', 'bollinger'];
   final Map<String, bool> _indicatorEnabled = {
     'sma20': true,
@@ -87,6 +90,8 @@ class ChartStore extends ChangeNotifier {
   BacktestResult? get backtest => _backtest;
   List<double?> get equitySeries => _equitySeries;
   List<TradeMarker> get backtestMarkers => _backtestMarkers;
+  SmcAnalysisResult? get smc => _smc;
+  bool get smcEnabled => _smcEnabled;
 
   /// The right edge (in bar index terms, -1 = follow) shared with synced charts.
   int get syncRight => _right;
@@ -160,9 +165,11 @@ class ChartStore extends ChangeNotifier {
     _drawings = [];
     _selectedDrawingId = null;
     _nextDrawingId = 1;
+    _smc = null;
     _resetView();
     _subscribeCandleChannel();
     await _load();
+    if (_smcEnabled) _loadSmc();
   }
 
   Future<void> setTimeframe(Timeframe tf) async {
@@ -171,14 +178,22 @@ class ChartStore extends ChangeNotifier {
     _drawings = [];
     _selectedDrawingId = null;
     _nextDrawingId = 1;
+    _smc = null;
     _resetView();
     _subscribeCandleChannel();
     await _load();
+    if (_smcEnabled) _loadSmc();
   }
 
   void toggleIndicator(String key) {
     if (!_indicatorEnabled.containsKey(key)) return;
     _indicatorEnabled[key] = !(_indicatorEnabled[key] ?? false);
+    notifyListeners();
+  }
+
+  void toggleSmc() {
+    _smcEnabled = !_smcEnabled;
+    if (_smcEnabled && _smc == null) _loadSmc();
     notifyListeners();
   }
 
@@ -392,6 +407,7 @@ class ChartStore extends ChangeNotifier {
     _backtest = null;
     _equitySeries = const [];
     _backtestMarkers = const [];
+    _smc = null;
   }
 
   void _subscribeCandleChannel() {
@@ -422,6 +438,19 @@ class ChartStore extends ChangeNotifier {
         _loading = false;
         notifyListeners();
       }
+    }
+  }
+
+  Future<void> _loadSmc() async {
+    try {
+      final data = await _api.get(
+        '/smc?symbol=$_symbol&tf=${_timeframe.api}&limit=500',
+      );
+      if (_disposed) return;
+      _smc = SmcAnalysisResult.fromJson(data as Map<String, dynamic>);
+      notifyListeners();
+    } catch (_) {
+      // SMC is optional enhancement — ignore failures
     }
   }
 
