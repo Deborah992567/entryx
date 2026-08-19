@@ -59,8 +59,9 @@ Legend: `[x]` done · `[~]` in progress · `[ ]` planned
 - [x] Deterministic detectors: swing H/L, HH/HL/LH/LL, BOS, CHoCH, trend/range, breakout/retest
   (`app/services/market_structure.py` + `/api/v1/structure`; swing confirmation is
   look-ahead-safe, every object carries ts/bar_index/price/strength/invalidation)
-- [ ] FVG, order blocks, breaker blocks, liquidity pools, EQH/EQL, sweeps, displacement,
-  premium/discount — each object has ts, timeframe, range, strength, status, invalidation
+- [x] SMC price-object detectors: FVG, order blocks, breaker blocks, liquidity pools,
+  EQH/EQL, sweeps, displacement, premium/discount — each object has ts, timeframe,
+  range, strength, status, invalidation (`app/services/smc_objects.py` + `/api/v1/smc`)
 - [ ] Chart rendering of detected structures
 
 ## PHASE 7 — Local AI infrastructure
