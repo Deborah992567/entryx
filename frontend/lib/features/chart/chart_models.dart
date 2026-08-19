@@ -810,6 +810,100 @@ class FibRetracementDrawing extends ChartDrawing {
   }
 }
 
+/// A single Smart Money Concept object from the backend analysis.
+class SmcObject {
+  const SmcObject({
+    required this.kind,
+    required this.barIndex,
+    required this.ts,
+    required this.timeframe,
+    required this.direction,
+    required this.rangeLow,
+    required this.rangeHigh,
+    this.strength = 1.0,
+    this.status = 'active',
+    this.invalidationPrice,
+    this.meta = const {},
+  });
+
+  final String kind;
+  final int barIndex;
+  final DateTime ts;
+  final String timeframe;
+  final String direction;
+  final double rangeLow;
+  final double rangeHigh;
+  final double strength;
+  final String status;
+  final double? invalidationPrice;
+  final Map<String, dynamic> meta;
+
+  bool get isBullish => direction == 'bullish';
+  bool get isActive => status == 'active';
+
+  factory SmcObject.fromJson(Map<String, dynamic> json) => SmcObject(
+        kind: json['kind'] as String,
+        barIndex: json['bar_index'] as int,
+        ts: DateTime.parse(json['ts'] as String).toLocal(),
+        timeframe: json['timeframe'] as String,
+        direction: json['direction'] as String,
+        rangeLow: (json['range_low'] as num).toDouble(),
+        rangeHigh: (json['range_high'] as num).toDouble(),
+        strength: (json['strength'] as num?)?.toDouble() ?? 1.0,
+        status: json['status'] as String? ?? 'active',
+        invalidationPrice: (json['invalidation_price'] as num?)?.toDouble(),
+        meta: (json['meta'] as Map<String, dynamic>?) ?? const {},
+      );
+}
+
+/// Full SMC analysis result from the backend.
+class SmcAnalysisResult {
+  const SmcAnalysisResult({
+    required this.symbol,
+    required this.timeframe,
+    required this.candles,
+    this.fvg = const [],
+    this.displacement = const [],
+    this.liquidityPools = const [],
+    this.sweeps = const [],
+    this.orderBlocks = const [],
+    this.breakerBlocks = const [],
+    this.premiumDiscount = const [],
+  });
+
+  final String symbol;
+  final String timeframe;
+  final int candles;
+  final List<SmcObject> fvg;
+  final List<SmcObject> displacement;
+  final List<SmcObject> liquidityPools;
+  final List<SmcObject> sweeps;
+  final List<SmcObject> orderBlocks;
+  final List<SmcObject> breakerBlocks;
+  final List<SmcObject> premiumDiscount;
+
+  factory SmcAnalysisResult.fromJson(Map<String, dynamic> json) =>
+      SmcAnalysisResult(
+        symbol: json['symbol'] as String,
+        timeframe: json['timeframe'] as String,
+        candles: json['candles'] as int,
+        fvg: _parseList(json['fvg']),
+        displacement: _parseList(json['displacement']),
+        liquidityPools: _parseList(json['liquidity_pools']),
+        sweeps: _parseList(json['sweeps']),
+        orderBlocks: _parseList(json['order_blocks']),
+        breakerBlocks: _parseList(json['breaker_blocks']),
+        premiumDiscount: _parseList(json['premium_discount']),
+      );
+
+  static List<SmcObject> _parseList(dynamic raw) {
+    if (raw is! List) return const [];
+    return raw
+        .map((e) => SmcObject.fromJson(e as Map<String, dynamic>))
+        .toList(growable: false);
+  }
+}
+
 /// Parses a drawing from its JSON form (discriminated by `type`).
 ChartDrawing chartDrawingFromJson(Map<String, dynamic> json) => switch (json['type']) {
       'trendLine' => TrendLineDrawing.fromJson(json),
