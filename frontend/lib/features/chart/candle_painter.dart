@@ -32,6 +32,7 @@ class CandleChartPainter extends CustomPainter {
     this.equitySeries = const [],
     this.markers = const [],
     this.template = ChartTemplate.dark,
+    this.smc,
   });
 
   final List<models.ChartCandle> candles;
@@ -50,6 +51,7 @@ class CandleChartPainter extends CustomPainter {
   final List<double?> equitySeries;
   final List<models.TradeMarker> markers;
   final ChartTemplate template;
+  final models.SmcAnalysisResult? smc;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -89,6 +91,7 @@ class CandleChartPainter extends CustomPainter {
       _drawEquityPane(canvas, geo);
     }
     _drawTradeMarkers(canvas, geo);
+    _drawSmcObjects(canvas, geo);
 
     if (lastPrice != null) {
       _drawLastPriceTag(canvas, geo, lastPrice!);
@@ -542,7 +545,182 @@ class CandleChartPainter extends CustomPainter {
     canvas.drawLine(origin, origin + dir * math.max(t, 0), paint);
   }
 
-  // ------------------------------------------------------------------- crosshair
+  // ----------------------------------------------------------------- SMC objects
+
+  static const Color _fvgBull = Color(0x3026A69A);
+  static const Color _fvgBear = Color(0x30EF5350);
+  static const Color _obBull = Color(0x4026A69A);
+  static const Color _obBear = Color(0x40EF5350);
+  static const Color _breakerBull = Color(0x307E57C2);
+  static const Color _breakerBear = Color(0x30AB47BC);
+  static const Color _pdPremium = Color(0x20FF9800);
+  static const Color _pdDiscount = Color(0x202196F3);
+  static const Color _poolColor = Color(0xFFFFD54F);
+  static const Color _sweepColor = Color(0xFFFF7043);
+  static const Color _displacementColor = Color(0x50FFEB3B);
+
+  void _drawSmcObjects(Canvas canvas, ChartGeometry geo) {
+    final smcData = smc;
+    if (smcData == null) return;
+    for (final obj in smcData.fvg) {
+      _drawFvg(canvas, geo, obj);
+    }
+    for (final obj in smcData.orderBlocks) {
+      _drawOrderBlock(canvas, geo, obj);
+    }
+    for (final obj in smcData.breakerBlocks) {
+      _drawBreakerBlock(canvas, geo, obj);
+    }
+    for (final obj in smcData.premiumDiscount) {
+      _drawPremiumDiscount(canvas, geo, obj);
+    }
+    for (final obj in smcData.liquidityPools) {
+      _drawLiquidityPool(canvas, geo, obj);
+    }
+    for (final obj in smcData.sweeps) {
+      _drawSweep(canvas, geo, obj);
+    }
+    for (final obj in smcData.displacement) {
+      _drawDisplacement(canvas, geo, obj);
+    }
+  }
+
+  void _drawFvg(Canvas canvas, ChartGeometry geo, models.SmcObject obj) {
+    if (obj.barIndex >= end || obj.barIndex < start) return;
+    final color = obj.isBullish ? _fvgBull : _fvgBear;
+    final yTop = geo.yForPrice(obj.rangeHigh);
+    final yBottom = geo.yForPrice(obj.rangeLow);
+    final x = geo.xForBar(obj.barIndex.toDouble());
+    final right = obj.isActive ? geo.chartWidth : x + geo.barWidth * 3;
+    final fill = Paint()..color = color;
+    canvas.drawRect(Rect.fromLTRB(x, yTop, right, yBottom), fill);
+    final border = Paint()
+      ..color = color.withValues(alpha: 0.7)
+      ..strokeWidth = 0.8
+      ..style = PaintingStyle.stroke;
+    canvas.drawRect(Rect.fromLTRB(x, yTop, right, yBottom), border);
+  }
+
+  void _drawOrderBlock(Canvas canvas, ChartGeometry geo, models.SmcObject obj) {
+    if (obj.barIndex >= end || obj.barIndex < start) return;
+    final color = obj.isBullish ? _obBull : _obBear;
+    final yTop = geo.yForPrice(obj.rangeHigh);
+    final yBottom = geo.yForPrice(obj.rangeLow);
+    final x = geo.xForBar(obj.barIndex.toDouble());
+    final right = obj.isActive ? geo.chartWidth : x + geo.barWidth * 4;
+    final fill = Paint()..color = color;
+    canvas.drawRect(Rect.fromLTRB(x, yTop, right, yBottom), fill);
+    final border = Paint()
+      ..color = color.withValues(alpha: 0.8)
+      ..strokeWidth = 1.2
+      ..style = PaintingStyle.stroke;
+    canvas.drawRect(Rect.fromLTRB(x, yTop, right, yBottom), border);
+  }
+
+  void _drawBreakerBlock(Canvas canvas, ChartGeometry geo, models.SmcObject obj) {
+    if (obj.barIndex >= end || obj.barIndex < start) return;
+    final color = obj.isBullish ? _breakerBull : _breakerBear;
+    final yTop = geo.yForPrice(obj.rangeHigh);
+    final yBottom = geo.yForPrice(obj.rangeLow);
+    final x = geo.xForBar(obj.barIndex.toDouble());
+    final right = obj.isActive ? geo.chartWidth : x + geo.barWidth * 4;
+    final fill = Paint()..color = color;
+    canvas.drawRect(Rect.fromLTRB(x, yTop, right, yBottom), fill);
+    // hatched pattern for breaker blocks
+    final hatch = Paint()
+      ..color = color.withValues(alpha: 0.9)
+      ..strokeWidth = 0.6;
+    final step = 6.0;
+    for (var dx = 0.0; dx < right - x; dx += step) {
+      final x1 = x + dx;
+      final x2 = x1 - (yBottom - yTop);
+      final clipLeft = x1 < x ? x : x1;
+      final clipRight = x2 < x ? x : x2;
+      canvas.drawLine(
+        Offset(clipLeft, yTop),
+        Offset(clipRight, yBottom),
+        hatch,
+      );
+    }
+  }
+
+  void _drawPremiumDiscount(Canvas canvas, ChartGeometry geo, models.SmcObject obj) {
+    if (obj.barIndex >= end || obj.barIndex < start) return;
+    final isPremium = obj.kind == 'premium';
+    final color = isPremium ? _pdPremium : _pdDiscount;
+    final yTop = geo.yForPrice(obj.rangeHigh);
+    final yBottom = geo.yForPrice(obj.rangeLow);
+    final x = geo.xForBar(obj.barIndex.toDouble());
+    final fill = Paint()..color = color;
+    canvas.drawRect(Rect.fromLTRB(x, yTop, geo.chartWidth, yBottom), fill);
+    // midpoint dashed line
+    final mid = (obj.rangeHigh + obj.rangeLow) / 2;
+    final yMid = geo.yForPrice(mid);
+    final dash = Paint()
+      ..color = color.withValues(alpha: 0.8)
+      ..strokeWidth = 0.8;
+    const dashLen = 4.0;
+    const gapLen = 3.0;
+    var dx = x;
+    while (dx < geo.chartWidth) {
+      canvas.drawLine(Offset(dx, yMid), Offset(dx + dashLen, yMid), dash);
+      dx += dashLen + gapLen;
+    }
+  }
+
+  void _drawLiquidityPool(Canvas canvas, ChartGeometry geo, models.SmcObject obj) {
+    if (obj.barIndex >= end || obj.barIndex < start) return;
+    final y = geo.yForPrice(obj.rangeHigh);
+    final x = geo.xForBar(obj.barIndex.toDouble());
+    final paint = Paint()
+      ..color = _poolColor.withValues(alpha: 0.7)
+      ..strokeWidth = 1.0;
+    const dashLen = 5.0;
+    const gapLen = 3.0;
+    var dx = x;
+    while (dx < geo.chartWidth) {
+      canvas.drawLine(Offset(dx, y), Offset(dx + dashLen, y), paint);
+      dx += dashLen + gapLen;
+    }
+    // label
+    final label = obj.kind.toUpperCase();
+    _drawText(canvas, label, Offset(x + 2, y - 12), _poolColor, fontSize: 8);
+  }
+
+  void _drawSweep(Canvas canvas, ChartGeometry geo, models.SmcObject obj) {
+    if (obj.barIndex >= end || obj.barIndex < start) return;
+    final x = geo.xForBar(obj.barIndex.toDouble());
+    final yPool = geo.yForPrice(obj.rangeHigh);
+    final yWick = obj.isBullish
+        ? geo.yForPrice(obj.rangeLow)
+        : geo.yForPrice(obj.rangeHigh);
+    final paint = Paint()
+      ..color = _sweepColor
+      ..strokeWidth = 1.8;
+    canvas.drawLine(Offset(x, yPool), Offset(x, yWick), paint);
+    // small triangle arrow at the sweep point
+    final tip = Offset(x, yPool);
+    final dir = obj.isBullish ? -1.0 : 1.0;
+    final arrow = Path()
+      ..moveTo(tip.dx - 3, tip.dy + dir * 6)
+      ..lineTo(tip.dx + 3, tip.dy + dir * 6)
+      ..lineTo(tip.dx, tip.dy)
+      ..close();
+    canvas.drawPath(arrow, Paint()..color = _sweepColor);
+  }
+
+  void _drawDisplacement(Canvas canvas, ChartGeometry geo, models.SmcObject obj) {
+    if (obj.barIndex < start || obj.barIndex >= end) return;
+    final candle = candles[obj.barIndex];
+    final x = geo.xForBar(obj.barIndex.toDouble());
+    final bodyTop = geo.yForPrice(math.max(candle.o, candle.c));
+    final bodyBot = geo.yForPrice(math.min(candle.o, candle.c));
+    final highlight = Paint()..color = _displacementColor;
+    canvas.drawRect(
+      Rect.fromLTRB(x - geo.barWidth * 0.6, bodyTop, x + geo.barWidth * 0.6, bodyBot),
+      highlight,
+    );
+  }
 
   void _drawCrosshair(Canvas canvas, ChartGeometry geo, int index, double? price) {
     final x = geo.xForBar(index.toDouble());
