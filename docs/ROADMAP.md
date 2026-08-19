@@ -62,7 +62,8 @@ Legend: `[x]` done · `[~]` in progress · `[ ]` planned
 - [x] SMC price-object detectors: FVG, order blocks, breaker blocks, liquidity pools,
   EQH/EQL, sweeps, displacement, premium/discount — each object has ts, timeframe,
   range, strength, status, invalidation (`app/services/smc_objects.py` + `/api/v1/smc`)
-- [ ] Chart rendering of detected structures
+- [x] Chart rendering of detected structures (FVG zones, order blocks, breaker blocks,
+  premium/discount zones, liquidity pool lines, sweep arrows, displacement highlights)
 
 ## PHASE 7 — Local AI infrastructure
 
@@ -108,7 +109,7 @@ Legend: `[x]` done · `[~]` in progress · `[ ]` planned
 | 3 | Chart engine + indicators + drawings | done |
 | 4 | Trading engine + risk | done |
 | 5 | Strategy + backtesting + optimization | done |
-| 6 | Market structure + SMC | in progress |
+| 6 | Market structure + SMC | done |
 | 7 | Local AI infrastructure | planned |
 | 8 | AI applications | planned |
 | 9 | Broker adapters + live safeguards | planned |
