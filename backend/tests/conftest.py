@@ -31,8 +31,10 @@ def _reset_state():
     """Reset module-global state (rate limiter, WS manager) between tests."""
     import app.api.deps as deps
     import app.ws.manager as ws_manager
+    from app.middleware import RateLimitMiddleware
 
     deps._buckets.clear()
+    RateLimitMiddleware.reset()
     ws_manager.manager._connections.clear()
     ws_manager.manager._channels.clear()
     ws_manager.manager._seq.clear()

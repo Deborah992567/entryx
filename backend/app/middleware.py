@@ -27,11 +27,17 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 class RateLimitMiddleware(BaseHTTPMiddleware):
     """Simple in-memory rate limiter per client IP."""
 
+    _requests: dict[str, list[float]] = defaultdict(list)
+
     def __init__(self, app, max_requests: int = 120, window_seconds: int = 60):
         super().__init__(app)
         self.max_requests = max_requests
         self.window_seconds = window_seconds
-        self._requests: dict[str, list[float]] = defaultdict(list)
+
+    @classmethod
+    def reset(cls) -> None:
+        """Clear all accumulated request timestamps (useful in tests)."""
+        cls._requests.clear()
 
     async def dispatch(self, request: Request, call_next):
         client_ip = request.client.host if request.client else "unknown"
