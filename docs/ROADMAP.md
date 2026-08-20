@@ -76,7 +76,7 @@ Legend: `[x]` done · `[~]` in progress · `[ ]` planned
 
 - [x] Chart Explainer ("Explain This Chart") with structured output + honest uncertainty
 - [x] Market Scanner (multi-symbol/timeframe setups, filters)
-- [ ] Strategy Builder (NL → rules → backtest; no auto-live deploy)
+- [x] Strategy Builder (NL → rules → backtest; no auto-live deploy)
 - [x] Risk Copilot (pre-trade risk explanation)
 - [x] Trading Journal analysis (patterns, overtrading, time-of-day, strategy/symbol perf)
 
@@ -111,6 +111,6 @@ Legend: `[x]` done · `[~]` in progress · `[ ]` planned
 | 5 | Strategy + backtesting + optimization | done |
 | 6 | Market structure + SMC | done |
 | 7 | Local AI infrastructure | done |
-| 8 | AI applications | in progress |
+| 8 | AI applications | done |
 | 9 | Broker adapters + live safeguards | planned |
 | 10 | Hardening + packaging | planned |
