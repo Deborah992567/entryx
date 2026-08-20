@@ -18,6 +18,7 @@ from app.ws.manager import (
     CLOSE_AUTH_FAILED,
     CLOSE_TOO_MANY_CONNECTIONS,
     MAX_CONNECTIONS_PER_USER,
+    MAX_MESSAGE_BYTES,
     is_channel_authorized,
     manager,
     parse_message,
@@ -48,6 +49,16 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
     try:
         while True:
             raw = await websocket.receive_text()
+            if len(raw.encode("utf-8")) > MAX_MESSAGE_BYTES:
+                await manager.send(
+                    connection_id,
+                    {
+                        "type": "system.error",
+                        "channel": "system",
+                        "data": {"code": "ERR_WS", "message": "message too large"},
+                    },
+                )
+                continue
             try:
                 msg = parse_message(raw)
             except (ValueError, json.JSONDecodeError) as exc:
