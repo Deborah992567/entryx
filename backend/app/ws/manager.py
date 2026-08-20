@@ -18,6 +18,8 @@ from fastapi import WebSocket
 
 CLOSE_AUTH_FAILED = 4001
 CLOSE_INVALID_MESSAGE = 4002
+CLOSE_TOO_MANY_CONNECTIONS = 4003
+MAX_CONNECTIONS_PER_USER = 5
 
 
 class ConnectionManager:
@@ -27,12 +29,21 @@ class ConnectionManager:
         self._connections: dict[str, WebSocket] = {}
         self._channels: dict[str, set[str]] = defaultdict(set)
         self._seq: dict[str, int] = defaultdict(int)
+        self._user_connections: dict[int, set[str]] = defaultdict(set)
 
     # -- lifecycle -------------------------------------------------------
 
     async def connect(self, connection_id: str, websocket: WebSocket) -> None:
         await websocket.accept()
         self._connections[connection_id] = websocket
+
+    def track_user(self, connection_id: str, user_id: int) -> None:
+        self._user_connections[user_id].add(connection_id)
+
+    def user_connection_count(self, user_id: int) -> int:
+        active = {cid for cid in self._user_connections[user_id] if cid in self._connections}
+        self._user_connections[user_id] = active
+        return len(active)
 
     def disconnect(self, connection_id: str) -> list[str]:
         self._connections.pop(connection_id, None)
@@ -108,6 +119,7 @@ class ConnectionManager:
         return {
             "connections": len(self._connections),
             "channels": len(self._channels),
+            "users": len(self._user_connections),
         }
 
 

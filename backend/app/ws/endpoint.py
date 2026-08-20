@@ -16,6 +16,8 @@ from app.core.config import get_settings
 from app.core.security import decode_access_token
 from app.ws.manager import (
     CLOSE_AUTH_FAILED,
+    CLOSE_TOO_MANY_CONNECTIONS,
+    MAX_CONNECTIONS_PER_USER,
     is_channel_authorized,
     manager,
     parse_message,
@@ -36,7 +38,13 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
         return
 
     connection_id = f"u{user_id}:{uuid.uuid4().hex[:8]}"
+
+    if manager.user_connection_count(user_id) >= MAX_CONNECTIONS_PER_USER:
+        await websocket.close(code=CLOSE_TOO_MANY_CONNECTIONS, reason="too many connections")
+        return
+
     await manager.connect(connection_id, websocket)
+    manager.track_user(connection_id, user_id)
     try:
         while True:
             raw = await websocket.receive_text()
