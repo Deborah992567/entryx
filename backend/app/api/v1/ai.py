@@ -25,8 +25,11 @@ from app.schemas.ai import (
     ModelInfoOut,
     RiskRequest,
     ScanRequest,
+    StrategyBuildRequest,
+    StrategyRefineRequest,
 )
 from app.services.ai_service import AIService
+from app.services.strategy_builder import StrategyBuilderService
 
 router = APIRouter(prefix="/ai", tags=["ai"])
 
@@ -181,6 +184,34 @@ async def analyze_journal(
     return AnalysisResponse(
         content=content, model="", symbol="JOURNAL",
         timeframe="ALL", kind="journal",
+    )
+
+
+@router.post("/build-strategy", response_model=AnalysisResponse)
+async def build_strategy(
+    body: StrategyBuildRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> AnalysisResponse:
+    svc = StrategyBuilderService(db)
+    content = await svc.build_strategy(body.idea, user_id=user.id)
+    return AnalysisResponse(
+        content=content, model="", symbol="BUILDER",
+        timeframe="MULTI", kind="strategy_builder",
+    )
+
+
+@router.post("/refine-strategy", response_model=AnalysisResponse)
+async def refine_strategy(
+    body: StrategyRefineRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> AnalysisResponse:
+    svc = StrategyBuilderService(db)
+    content = await svc.refine_strategy(body.original_rules, body.feedback, user_id=user.id)
+    return AnalysisResponse(
+        content=content, model="", symbol="BUILDER",
+        timeframe="MULTI", kind="strategy_refine",
     )
 
 

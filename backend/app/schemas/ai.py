@@ -83,3 +83,12 @@ class RiskRequest(BaseModel):
 
 class JournalRequest(BaseModel):
     trades_json: str = "[]"
+
+
+class StrategyBuildRequest(BaseModel):
+    idea: str
+
+
+class StrategyRefineRequest(BaseModel):
+    original_rules: str
+    feedback: str
