@@ -36,6 +36,7 @@ router = APIRouter(prefix="/ai", tags=["ai"])
 
 # --------------------------------------------------------------- chat
 
+
 @router.post("/chat", response_model=ChatResponse)
 async def chat(
     body: ChatRequest,
@@ -100,6 +101,7 @@ def delete_conversation(
 
 # ----------------------------------------------------------- quick analysis
 
+
 @router.post("/analyze", response_model=AnalysisResponse)
 async def analyze(
     body: AnalysisRequest,
@@ -134,8 +136,11 @@ async def explain_chart(
     svc = AIService(db)
     content = await svc.explain_chart(body.symbol, body.timeframe, user_id=user.id)
     return AnalysisResponse(
-        content=content, model="", symbol=body.symbol,
-        timeframe=body.timeframe, kind="chart_explainer",
+        content=content,
+        model="",
+        symbol=body.symbol,
+        timeframe=body.timeframe,
+        kind="chart_explainer",
     )
 
 
@@ -148,7 +153,8 @@ async def scan_market(
     svc = AIService(db)
     content = await svc.scan_market(body.symbols, body.timeframes, user_id=user.id)
     return AnalysisResponse(
-        content=content, model="",
+        content=content,
+        model="",
         symbol=",".join(body.symbols),
         timeframe=",".join(body.timeframes),
         kind="scanner",
@@ -163,13 +169,18 @@ async def risk_copilot(
 ) -> AnalysisResponse:
     svc = AIService(db)
     content = await svc.explain_risk(
-        symbol=body.symbol, timeframe=body.timeframe,
-        entry_price=body.entry_price, direction=body.direction,
+        symbol=body.symbol,
+        timeframe=body.timeframe,
+        entry_price=body.entry_price,
+        direction=body.direction,
         user_id=user.id,
     )
     return AnalysisResponse(
-        content=content, model="", symbol=body.symbol,
-        timeframe=body.timeframe, kind="risk_copilot",
+        content=content,
+        model="",
+        symbol=body.symbol,
+        timeframe=body.timeframe,
+        kind="risk_copilot",
     )
 
 
@@ -182,8 +193,11 @@ async def analyze_journal(
     svc = AIService(db)
     content = await svc.analyze_journal(user.id, body.trades_json)
     return AnalysisResponse(
-        content=content, model="", symbol="JOURNAL",
-        timeframe="ALL", kind="journal",
+        content=content,
+        model="",
+        symbol="JOURNAL",
+        timeframe="ALL",
+        kind="journal",
     )
 
 
@@ -196,8 +210,11 @@ async def build_strategy(
     svc = StrategyBuilderService(db)
     content = await svc.build_strategy(body.idea, user_id=user.id)
     return AnalysisResponse(
-        content=content, model="", symbol="BUILDER",
-        timeframe="MULTI", kind="strategy_builder",
+        content=content,
+        model="",
+        symbol="BUILDER",
+        timeframe="MULTI",
+        kind="strategy_builder",
     )
 
 
@@ -210,12 +227,16 @@ async def refine_strategy(
     svc = StrategyBuilderService(db)
     content = await svc.refine_strategy(body.original_rules, body.feedback, user_id=user.id)
     return AnalysisResponse(
-        content=content, model="", symbol="BUILDER",
-        timeframe="MULTI", kind="strategy_refine",
+        content=content,
+        model="",
+        symbol="BUILDER",
+        timeframe="MULTI",
+        kind="strategy_refine",
     )
 
 
 # ----------------------------------------------------------- models + health
+
 
 @router.get("/models", response_model=list[ModelInfoOut])
 async def list_models(
@@ -224,7 +245,10 @@ async def list_models(
 ) -> list[ModelInfoOut]:
     svc = AIService(db)
     models = await svc.provider.list_models()
-    return [ModelInfoOut(name=m.name, family=m.family, size=m.size, description=m.description) for m in models]
+    return [
+        ModelInfoOut(name=m.name, family=m.family, size=m.size, description=m.description)
+        for m in models
+    ]
 
 
 @router.get("/health", response_model=HealthOut)

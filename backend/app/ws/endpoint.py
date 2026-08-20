@@ -45,7 +45,11 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
             except (ValueError, json.JSONDecodeError) as exc:
                 await manager.send(
                     connection_id,
-                    {"type": "system.error", "channel": "system", "data": {"code": "ERR_WS", "message": str(exc)}},
+                    {
+                        "type": "system.error",
+                        "channel": "system",
+                        "data": {"code": "ERR_WS", "message": str(exc)},
+                    },
                 )
                 continue
 
@@ -57,7 +61,10 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
                         {
                             "type": "system.error",
                             "channel": "system",
-                            "data": {"code": "ERR_FORBIDDEN", "message": f"channel '{channel}' not allowed"},
+                            "data": {
+                                "code": "ERR_FORBIDDEN",
+                                "message": f"channel '{channel}' not allowed",
+                            },
                         },
                     )
                     continue
@@ -68,7 +75,9 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
                 await manager.send(
                     connection_id,
                     {
-                        "type": "system.subscribed" if action == "subscribe" else "system.unsubscribed",
+                        "type": "system.subscribed"
+                        if action == "subscribe"
+                        else "system.unsubscribed",
                         "channel": channel,
                         "data": {"channel": channel},
                         "ts": time.time(),

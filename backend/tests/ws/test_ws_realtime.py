@@ -63,7 +63,10 @@ def test_ws_receives_position_and_account_events(client, auth_headers):
     user_id = 1
     with client.websocket_connect(f"/ws?token={_token(user_id=user_id)}") as ws:
         ws.send_json(
-            {"action": "subscribe", "channels": [f"account.{user_id}", "positions", "orders", "history"]}
+            {
+                "action": "subscribe",
+                "channels": [f"account.{user_id}", "positions", "orders", "history"],
+            }
         )
         # wait for the four subscription acks
         acks = 0

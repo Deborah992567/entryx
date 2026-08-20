@@ -30,9 +30,7 @@ def create_layout(
     return layout
 
 
-def update_layout(
-    db: Session, *, layout_id: int, user_id: int, payload: dict
-) -> ChartLayout:
+def update_layout(db: Session, *, layout_id: int, user_id: int, payload: dict) -> ChartLayout:
     layout = _get_owned(db, layout_id, user_id)
     if "name" in payload and payload["name"] is not None:
         layout.name = payload["name"]

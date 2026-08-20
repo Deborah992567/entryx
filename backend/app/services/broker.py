@@ -219,7 +219,11 @@ class PaperBroker(BrokerAdapter):
             fill_price = quote.ask if request.side == "buy" else quote.bid
             _validate_sl_tp(request.side, fill_price, request.sl, request.tp)
             return self._fill(
-                request, symbol=symbol, volume=volume, price=round(fill_price, info.digits), state="filled"
+                request,
+                symbol=symbol,
+                volume=volume,
+                price=round(fill_price, info.digits),
+                state="filled",
             )
 
         if request.price is None:
@@ -297,25 +301,42 @@ class PaperBroker(BrokerAdapter):
                 self._positions[pid] = updated
                 position = updated
             if position.sl is not None:
-                hit = quote.bid <= position.sl if position.side == "buy" else quote.ask >= position.sl
+                hit = (
+                    quote.bid <= position.sl if position.side == "buy" else quote.ask >= position.sl
+                )
                 if hit:
-                    events.append(("position.closed", self.close_position(position.id, price=position.sl)))
+                    events.append(
+                        ("position.closed", self.close_position(position.id, price=position.sl))
+                    )
                     continue
             if position.tp is not None:
-                hit = quote.bid >= position.tp if position.side == "buy" else quote.ask <= position.tp
+                hit = (
+                    quote.bid >= position.tp if position.side == "buy" else quote.ask <= position.tp
+                )
                 if hit:
-                    events.append(("position.closed", self.close_position(position.id, price=position.tp)))
+                    events.append(
+                        ("position.closed", self.close_position(position.id, price=position.tp))
+                    )
         return events
 
     # -- positions ------------------------------------------------------------
 
-    def close_position(self, position_id: str, price: float | None = None, volume: float | None = None, *, at: datetime | None = None) -> ClosedTrade:
+    def close_position(
+        self,
+        position_id: str,
+        price: float | None = None,
+        volume: float | None = None,
+        *,
+        at: datetime | None = None,
+    ) -> ClosedTrade:
         position = self._positions.get(position_id)
         if position is None:
             raise UnknownRefError(f"unknown position: {position_id}")
         at = at or datetime.now(UTC)
         quote = self._provider.quote(position.symbol)
-        close_price = price if price is not None else (quote.bid if position.side == "buy" else quote.ask)
+        close_price = (
+            price if price is not None else (quote.bid if position.side == "buy" else quote.ask)
+        )
         info = self._provider.symbol_info(position.symbol)
         close_price = round(close_price, info.digits)
         volume = round(position.volume if volume is None else volume, 4)
@@ -348,7 +369,9 @@ class PaperBroker(BrokerAdapter):
         if volume >= position.volume:
             del self._positions[position_id]
         else:
-            self._positions[position_id] = _replace_position(position, volume=round(position.volume - volume, 4))
+            self._positions[position_id] = _replace_position(
+                position, volume=round(position.volume - volume, 4)
+            )
         self._closed.append(trade)
         return trade
 
@@ -503,26 +526,51 @@ class PaperBroker(BrokerAdapter):
         if order.type == "stop_limit":
             triggered = order.triggered
             if not triggered:
-                stop_crossed = quote.ask >= order.price if order.side == "buy" else quote.bid <= order.price
+                stop_crossed = (
+                    quote.ask >= order.price if order.side == "buy" else quote.bid <= order.price
+                )
                 if stop_crossed:
                     triggered = True
                     order = _replace(order, triggered=True)
                     self._orders[order.id] = order
             if not triggered:
                 return None
-            limit_crossed = quote.ask <= order.limit_price if order.side == "buy" else quote.bid >= order.limit_price
+            limit_crossed = (
+                quote.ask <= order.limit_price
+                if order.side == "buy"
+                else quote.bid >= order.limit_price
+            )
             if not limit_crossed:
                 return None
             return self._fill(
-                order, symbol=order.symbol, volume=order.volume, price=order.limit_price, state="filled", order_id=order.id
+                order,
+                symbol=order.symbol,
+                volume=order.volume,
+                price=order.limit_price,
+                state="filled",
+                order_id=order.id,
             )
         if _is_crossed(order.side, order.type, quote, order.price):
             return self._fill(
-                order, symbol=order.symbol, volume=order.volume, price=order.price, state="filled", order_id=order.id
+                order,
+                symbol=order.symbol,
+                volume=order.volume,
+                price=order.price,
+                state="filled",
+                order_id=order.id,
             )
         return None
 
-    def _fill(self, request: OrderRequest, *, symbol: str, volume: float, price: float, state: str, order_id: str | None = None) -> BrokerOrder:
+    def _fill(
+        self,
+        request: OrderRequest,
+        *,
+        symbol: str,
+        volume: float,
+        price: float,
+        state: str,
+        order_id: str | None = None,
+    ) -> BrokerOrder:
         info = self._provider.symbol_info(symbol)
         margin = self.margin_required(symbol, volume, price)
         oid = order_id or _new_id("o")

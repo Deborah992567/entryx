@@ -21,7 +21,9 @@ def test_position_size_from_risk_pct(engine: RiskEngine) -> None:
 
 
 def test_position_size_clamped_to_limits(engine: RiskEngine) -> None:
-    lots = engine.position_size(symbol="EURUSD", equity=1_000_000, risk_pct=1, entry=1.10, sl=1.099999)
+    lots = engine.position_size(
+        symbol="EURUSD", equity=1_000_000, risk_pct=1, entry=1.10, sl=1.099999
+    )
     assert lots == pytest.approx(engine.limits.max_lots_per_order)
     tiny = engine.position_size(symbol="EURUSD", equity=100, risk_pct=0.01, entry=1.10, sl=1.09)
     assert tiny == pytest.approx(engine.limits.min_lots)
@@ -46,7 +48,9 @@ def test_rr_ratio(engine: RiskEngine) -> None:
 
 def test_margin_and_margin_level(engine: RiskEngine) -> None:
     info = market_data.symbol_info("EURUSD")
-    margin = engine.margin_required(price=1.10, contract_size=info.contract_size, volume=1.0, leverage=100)
+    margin = engine.margin_required(
+        price=1.10, contract_size=info.contract_size, volume=1.0, leverage=100
+    )
     assert margin == pytest.approx(1_100)
     assert engine.margin_level(equity=11_000, margin_used=1_100) == pytest.approx(1_000.0)
     assert engine.margin_level(equity=100, margin_used=0) == 0.0
@@ -54,7 +58,9 @@ def test_margin_and_margin_level(engine: RiskEngine) -> None:
 
 def test_exposure_value(engine: RiskEngine) -> None:
     info = market_data.symbol_info("EURUSD")
-    assert engine.exposure_value(price=1.10, contract_size=info.contract_size, volume=2.0) == pytest.approx(220_000)
+    assert engine.exposure_value(
+        price=1.10, contract_size=info.contract_size, volume=2.0
+    ) == pytest.approx(220_000)
 
 
 def test_assess_returns_full_metrics(engine: RiskEngine) -> None:
@@ -128,4 +134,6 @@ def test_validate_order_risk_pct_limit(engine: RiskEngine) -> None:
 def test_custom_limits_respected() -> None:
     limits = RiskLimits(max_lots_per_order=1.0, max_open_positions=2, max_risk_pct_per_trade=10.0)
     engine = RiskEngine(market_data, limits)
-    assert engine.position_size(symbol="EURUSD", equity=1_000_000, risk_pct=1, entry=1.10, sl=1.099999) == pytest.approx(1.0)
+    assert engine.position_size(
+        symbol="EURUSD", equity=1_000_000, risk_pct=1, entry=1.10, sl=1.099999
+    ) == pytest.approx(1.0)

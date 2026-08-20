@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-import pytest
-
 from app.providers.broker.safeguards import LiveSafeguards, SafeguardConfig
 from app.services.broker import OrderRequest
 
@@ -60,7 +58,8 @@ class TestLiveSafeguards:
 
     def test_blocked_symbol(self):
         cfg = SafeguardConfig(
-            live_enabled=True, require_confirmation=False,
+            live_enabled=True,
+            require_confirmation=False,
             blocked_symbols=["BTCUSD"],
         )
         sg = LiveSafeguards(_mock_broker(), cfg)
@@ -70,7 +69,8 @@ class TestLiveSafeguards:
 
     def test_allowed_symbols_restriction(self):
         cfg = SafeguardConfig(
-            live_enabled=True, require_confirmation=False,
+            live_enabled=True,
+            require_confirmation=False,
             allowed_symbols=["EURUSD"],
         )
         sg = LiveSafeguards(_mock_broker(), cfg)
@@ -88,7 +88,8 @@ class TestLiveSafeguards:
 
     def test_daily_loss_limit(self):
         cfg = SafeguardConfig(
-            live_enabled=True, require_confirmation=False,
+            live_enabled=True,
+            require_confirmation=False,
             max_daily_loss_pct=2.0,
         )
         broker = _mock_broker(equity=10000.0)

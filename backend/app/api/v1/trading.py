@@ -36,8 +36,13 @@ def account(user: User = Depends(get_current_user), _db: Session = Depends(get_d
 
 
 @router.get("/orders", response_model=list[OrderOut])
-def list_orders(user: User = Depends(get_current_user), _db: Session = Depends(get_db)) -> list[dict]:
-    return [trading_service.to_order_out(o) for o in trading_service.get_broker(user.id).pending_orders()]
+def list_orders(
+    user: User = Depends(get_current_user), _db: Session = Depends(get_db)
+) -> list[dict]:
+    return [
+        trading_service.to_order_out(o)
+        for o in trading_service.get_broker(user.id).pending_orders()
+    ]
 
 
 @router.post("/orders", response_model=OrderOut, status_code=status.HTTP_201_CREATED)
@@ -80,7 +85,9 @@ async def cancel_order(
 
 
 @router.get("/positions", response_model=list[PositionOut])
-def list_positions(user: User = Depends(get_current_user), _db: Session = Depends(get_db)) -> list[dict]:
+def list_positions(
+    user: User = Depends(get_current_user), _db: Session = Depends(get_db)
+) -> list[dict]:
     return trading_service.list_positions(user.id)
 
 
@@ -127,8 +134,12 @@ async def modify_position(
 
 
 @router.get("/history", response_model=list[TradeOut])
-def list_history(user: User = Depends(get_current_user), _db: Session = Depends(get_db)) -> list[dict]:
-    return [trading_service.to_trade_out(t) for t in trading_service.get_broker(user.id).closed_trades()]
+def list_history(
+    user: User = Depends(get_current_user), _db: Session = Depends(get_db)
+) -> list[dict]:
+    return [
+        trading_service.to_trade_out(t) for t in trading_service.get_broker(user.id).closed_trades()
+    ]
 
 
 @router.post("/risk/assess", response_model=RiskAssessmentOut)

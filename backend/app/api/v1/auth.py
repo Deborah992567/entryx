@@ -60,7 +60,10 @@ def logout(
     user: User = Depends(get_current_user),
 ) -> None:
     auth_service.logout(
-        db, raw_refresh=body.refresh_token, user_id=user.id, ip=request.client.host if request.client else ""
+        db,
+        raw_refresh=body.refresh_token,
+        user_id=user.id,
+        ip=request.client.host if request.client else "",
     )
 
 

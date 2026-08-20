@@ -11,7 +11,7 @@ from app.api.v1.router import api_router
 from app.core.config import get_settings
 from app.core.exceptions import register_exception_handlers
 from app.core.logging import setup_logging
-from app.middleware import SecurityHeadersMiddleware, RateLimitMiddleware
+from app.middleware import RateLimitMiddleware, SecurityHeadersMiddleware
 from app.services import broadcaster
 from app.ws import endpoint
 from app.ws.manager import manager

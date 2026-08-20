@@ -8,12 +8,11 @@ AIProvider interface. No paid APIs, no data leaves the machine.
 from __future__ import annotations
 
 import time
-from typing import AsyncIterator
+from collections.abc import AsyncIterator
 
 import httpx
-
 from app.core.config import get_settings
-from app.providers.ai.base import AIModelInfo, AIProvider, AIMessage, AIResponse
+from app.providers.ai.base import AIMessage, AIModelInfo, AIProvider, AIResponse
 
 
 class OllamaProvider(AIProvider):
@@ -139,9 +138,7 @@ class OllamaProvider(AIProvider):
                 name = m.get("name", "")
                 family = _detect_family(name)
                 size = _extract_size(name)
-                result.append(
-                    AIModelInfo(name=name, family=family, size=size, description="")
-                )
+                result.append(AIModelInfo(name=name, family=family, size=size, description=""))
             return result
         except Exception:
             return []

@@ -49,7 +49,9 @@ class RiskEngine:
         return round(reward / risk, 2)
 
     @staticmethod
-    def margin_required(price: float, contract_size: float, volume: float, leverage: float) -> float:
+    def margin_required(
+        price: float, contract_size: float, volume: float, leverage: float
+    ) -> float:
         return round(price * contract_size * volume / leverage, 2)
 
     @staticmethod
@@ -68,7 +70,9 @@ class RiskEngine:
         info = self.symbol_info(symbol)
         return round(self.stop_distance(entry, sl) * info.contract_size, 8)
 
-    def position_size(self, *, symbol: str, equity: float, risk_pct: float, entry: float, sl: float) -> float:
+    def position_size(
+        self, *, symbol: str, equity: float, risk_pct: float, entry: float, sl: float
+    ) -> float:
         info = self.symbol_info(symbol)
         dist = self.stop_distance(entry, sl)
         if dist <= 0:
@@ -76,7 +80,9 @@ class RiskEngine:
         lots = self.risk_amount(equity, risk_pct) / (dist * info.contract_size)
         return self._clamp_lots(lots)
 
-    def risk_pct(self, *, symbol: str, equity: float, entry: float, sl: float, volume: float) -> float:
+    def risk_pct(
+        self, *, symbol: str, equity: float, entry: float, sl: float, volume: float
+    ) -> float:
         if equity <= 0:
             return 0.0
         loss = self.loss_per_lot(symbol, entry, sl) * volume
@@ -106,7 +112,9 @@ class RiskEngine:
             if dist <= 0:
                 raise ValueError("stop distance must be positive")
             lots = self._clamp_lots(risk_amount / (dist * info.contract_size))
-            actual_risk = self.risk_pct(symbol=symbol, equity=equity, entry=entry, sl=sl, volume=lots)
+            actual_risk = self.risk_pct(
+                symbol=symbol, equity=equity, entry=entry, sl=sl, volume=lots
+            )
         reward = round(abs(tp - entry), info.digits) if tp is not None else 0.0
         ratio = self.rr(entry, sl, tp) if sl is not None and tp is not None else 0.0
         return {
@@ -141,7 +149,9 @@ class RiskEngine:
         """Return a list of limit violations (empty when the order is allowed)."""
         errors: list[str] = []
         if volume > self.limits.max_lots_per_order:
-            errors.append(f"volume {volume} exceeds max lots per order ({self.limits.max_lots_per_order})")
+            errors.append(
+                f"volume {volume} exceeds max lots per order ({self.limits.max_lots_per_order})"
+            )
         if open_volume_symbol + volume > self.limits.max_lots_per_symbol:
             errors.append(
                 f"total volume {open_volume_symbol + volume:.2f} exceeds max lots per symbol ({self.limits.max_lots_per_symbol})"
@@ -151,8 +161,12 @@ class RiskEngine:
         if sl is not None:
             pct = self.risk_pct(symbol=symbol, equity=equity, entry=entry, sl=sl, volume=volume)
             if pct > self.limits.max_risk_pct_per_trade:
-                errors.append(f"risk {pct:.2f}% exceeds max risk per trade ({self.limits.max_risk_pct_per_trade}%)")
-        margin = self.margin_required(entry, self.symbol_info(symbol).contract_size, volume, leverage)
+                errors.append(
+                    f"risk {pct:.2f}% exceeds max risk per trade ({self.limits.max_risk_pct_per_trade}%)"
+                )
+        margin = self.margin_required(
+            entry, self.symbol_info(symbol).contract_size, volume, leverage
+        )
         if margin > free_margin:
             errors.append("insufficient free margin for this order")
         return errors

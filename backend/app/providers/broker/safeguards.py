@@ -8,7 +8,7 @@ user confirmation at every step.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from app.services.broker import BrokerAdapter, BrokerOrder, OrderRequest
 
@@ -45,7 +45,7 @@ class LiveSafeguards:
         self._broker = broker
         self._config = config or SafeguardConfig()
         self._daily_pnl: float = 0.0
-        self._daily_reset: datetime = datetime.now(timezone.utc).date()
+        self._daily_reset: datetime = datetime.now(UTC).date()
         self._trade_log: list[dict] = []
 
     @property
@@ -128,7 +128,9 @@ class LiveSafeguards:
             self._log_trade("place_order", request.symbol, request.side, request.volume, True)
             return True, "Order placed", order
         except Exception as exc:
-            self._log_trade("place_order", request.symbol, request.side, request.volume, False, str(exc))
+            self._log_trade(
+                "place_order", request.symbol, request.side, request.volume, False, str(exc)
+            )
             return False, str(exc), None
 
     # -------------------------------------------------------------- logging
@@ -142,15 +144,17 @@ class LiveSafeguards:
         success: bool,
         error: str = "",
     ) -> None:
-        self._trade_log.append({
-            "ts": datetime.now(timezone.utc).isoformat(),
-            "action": action,
-            "symbol": symbol,
-            "side": side,
-            "volume": volume,
-            "success": success,
-            "error": error,
-        })
+        self._trade_log.append(
+            {
+                "ts": datetime.now(UTC).isoformat(),
+                "action": action,
+                "symbol": symbol,
+                "side": side,
+                "volume": volume,
+                "success": success,
+                "error": error,
+            }
+        )
 
     def get_trade_log(self) -> list[dict]:
         return list(self._trade_log)
@@ -158,7 +162,7 @@ class LiveSafeguards:
     # -------------------------------------------------------------- daily loss tracking
 
     def _check_daily_loss(self) -> None:
-        today = datetime.now(timezone.utc).date()
+        today = datetime.now(UTC).date()
         if today != self._daily_reset:
             self._daily_pnl = 0.0
             self._daily_reset = today

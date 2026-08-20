@@ -72,7 +72,12 @@ def test_invalid_config_returns_400(client: TestClient, auth_headers: dict) -> N
     resp = client.post(
         "/api/v1/backtests",
         headers=auth_headers,
-        json={"strategy": "sma_cross", "symbol": "EURUSD", "candle_count": 10, "config": {"initial_balance": 1}},
+        json={
+            "strategy": "sma_cross",
+            "symbol": "EURUSD",
+            "candle_count": 10,
+            "config": {"initial_balance": 1},
+        },
     )
     assert resp.status_code == 422
 
@@ -168,7 +173,9 @@ def test_other_users_cannot_read_others_runs(client: TestClient, auth_headers: d
         json={"email": "other@entryx.com", "password": "sup3rSecret", "name": "Other"},
     )
     assert other.status_code == 201
-    login = client.post("/api/v1/auth/login", json={"email": "other@entryx.com", "password": "sup3rSecret"})
+    login = client.post(
+        "/api/v1/auth/login", json={"email": "other@entryx.com", "password": "sup3rSecret"}
+    )
     other_headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
 
     resp = client.get(f"/api/v1/backtests/{run_id}", headers=other_headers)

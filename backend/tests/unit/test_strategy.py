@@ -53,7 +53,9 @@ class FakeProvider:
         self._candles = candles
         self._quote = quote or make_quote(candles[0].symbol if candles else "EURUSD")
 
-    def candles(self, symbol: str, timeframe: str, count: int, end_ts: datetime | None = None) -> list[Candle]:
+    def candles(
+        self, symbol: str, timeframe: str, count: int, end_ts: datetime | None = None
+    ) -> list[Candle]:
         return self._candles
 
     def quote(self, symbol: str, at: datetime | None = None) -> Quote:
@@ -90,7 +92,9 @@ def test_engine_start_unknown_strategy_raises_keyerror() -> None:
     provider = FakeProvider([])
     broker = PaperBroker(provider)
     with pytest.raises(KeyError):
-        strategy_engine.start(user_id=1, name="does_not_exist", symbol="EURUSD", provider=provider, broker=broker)
+        strategy_engine.start(
+            user_id=1, name="does_not_exist", symbol="EURUSD", provider=provider, broker=broker
+        )
 
 
 # -- start / summary --------------------------------------------------------
@@ -117,8 +121,12 @@ def test_start_runs_warmup_and_returns_summary() -> None:
 def test_two_starts_get_distinct_magic_numbers() -> None:
     provider = FakeProvider(candles_for([100.0] * 8))
     broker = PaperBroker(provider)
-    a = strategy_engine.start(user_id=1, name="sma_cross", symbol="EURUSD", provider=provider, broker=broker)
-    b = strategy_engine.start(user_id=1, name="sma_cross", symbol="EURUSD", provider=provider, broker=broker)
+    a = strategy_engine.start(
+        user_id=1, name="sma_cross", symbol="EURUSD", provider=provider, broker=broker
+    )
+    b = strategy_engine.start(
+        user_id=1, name="sma_cross", symbol="EURUSD", provider=provider, broker=broker
+    )
     assert a["magic"] != b["magic"]
     assert a["instance_id"] != b["instance_id"]
 
@@ -126,8 +134,12 @@ def test_two_starts_get_distinct_magic_numbers() -> None:
 def test_instances_are_scoped_per_user() -> None:
     provider = FakeProvider(candles_for([100.0] * 8))
     broker = PaperBroker(provider)
-    strategy_engine.start(user_id=1, name="sma_cross", symbol="EURUSD", provider=provider, broker=broker)
-    strategy_engine.start(user_id=2, name="sma_cross", symbol="EURUSD", provider=provider, broker=broker)
+    strategy_engine.start(
+        user_id=1, name="sma_cross", symbol="EURUSD", provider=provider, broker=broker
+    )
+    strategy_engine.start(
+        user_id=2, name="sma_cross", symbol="EURUSD", provider=provider, broker=broker
+    )
     assert len(strategy_engine.instances(1)) == 1
     assert len(strategy_engine.instances(2)) == 1
 
@@ -135,7 +147,9 @@ def test_instances_are_scoped_per_user() -> None:
 def test_stop_returns_summary_and_removes_instance() -> None:
     provider = FakeProvider(candles_for([100.0] * 8))
     broker = PaperBroker(provider)
-    summary = strategy_engine.start(user_id=1, name="sma_cross", symbol="EURUSD", provider=provider, broker=broker)
+    summary = strategy_engine.start(
+        user_id=1, name="sma_cross", symbol="EURUSD", provider=provider, broker=broker
+    )
     stopped = strategy_engine.stop(1, summary["instance_id"])
     assert stopped["status"] == "stopped"
     assert strategy_engine.instances(1) == []
@@ -148,7 +162,9 @@ def test_stop_returns_summary_and_removes_instance() -> None:
 def test_clear_empties_engine() -> None:
     provider = FakeProvider(candles_for([100.0] * 8))
     broker = PaperBroker(provider)
-    strategy_engine.start(user_id=1, name="sma_cross", symbol="EURUSD", provider=provider, broker=broker)
+    strategy_engine.start(
+        user_id=1, name="sma_cross", symbol="EURUSD", provider=provider, broker=broker
+    )
     strategy_engine.clear()
     assert strategy_engine.instances(1) == []
 
@@ -239,8 +255,12 @@ def test_feed_quote_dispatches_only_to_matching_symbol() -> None:
     eurusd = FakeProvider(candles_for([100.0] * 8), make_quote("EURUSD"))
     xauusd = FakeProvider(candles_for([2350.0] * 8), make_quote("XAUUSD"))
     broker = PaperBroker(eurusd)
-    a = strategy_engine.start(user_id=1, name="tick_counter", symbol="EURUSD", provider=eurusd, broker=broker)
-    b = strategy_engine.start(user_id=1, name="tick_counter", symbol="XAUUSD", provider=xauusd, broker=broker)
+    a = strategy_engine.start(
+        user_id=1, name="tick_counter", symbol="EURUSD", provider=eurusd, broker=broker
+    )
+    b = strategy_engine.start(
+        user_id=1, name="tick_counter", symbol="XAUUSD", provider=xauusd, broker=broker
+    )
 
     strategy_engine.feed_quote("EURUSD")
     strategy_engine.feed_quote("EURUSD")
@@ -266,7 +286,9 @@ register_strategy(Boom)
 def test_hook_error_transitions_runner_to_error_without_escaping() -> None:
     provider = FakeProvider(candles_for([100.0] * 8))
     broker = PaperBroker(provider)
-    summary = strategy_engine.start(user_id=1, name="boom", symbol="EURUSD", provider=provider, broker=broker)
+    summary = strategy_engine.start(
+        user_id=1, name="boom", symbol="EURUSD", provider=provider, broker=broker
+    )
     assert summary["status"] == "error"  # warm-up quote already tripped on_tick
     assert "on_tick" in summary["last_error"]
     assert "boom" in summary["last_error"]
@@ -275,8 +297,12 @@ def test_hook_error_transitions_runner_to_error_without_escaping() -> None:
 def test_errored_runner_does_not_take_down_others() -> None:
     provider = FakeProvider(candles_for([100.0] * 8), make_quote("EURUSD"))
     broker = PaperBroker(provider)
-    boom = strategy_engine.start(user_id=1, name="boom", symbol="EURUSD", provider=provider, broker=broker)
-    safe = strategy_engine.start(user_id=1, name="tick_counter", symbol="EURUSD", provider=provider, broker=broker)
+    boom = strategy_engine.start(
+        user_id=1, name="boom", symbol="EURUSD", provider=provider, broker=broker
+    )
+    safe = strategy_engine.start(
+        user_id=1, name="tick_counter", symbol="EURUSD", provider=provider, broker=broker
+    )
     assert strategy_engine._instances[boom["instance_id"]].runner.status == "error"
 
     strategy_engine.feed_quote("EURUSD")

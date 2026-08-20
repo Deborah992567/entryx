@@ -188,9 +188,7 @@ class TestVolume:
 
 class TestDirectional:
     def test_adx_uptrend(self):
-        candles_ = [
-            candle(10 + i, 11 + i, 9 + i, 10.5 + i, 1) for i in range(40)
-        ]
+        candles_ = [candle(10 + i, 11 + i, 9 + i, 10.5 + i, 1) for i in range(40)]
         out = adx(candles_, 14)
         assert out["adx"][0] is None
         # persistent uptrend -> +DI high, -DI ~0 -> ADX meaningful
@@ -229,8 +227,22 @@ class TestRegistry:
     def test_all_indicators_available(self):
         names = indicator_names()
         assert {
-            "sma", "ema", "wma", "rsi", "macd", "stochastic", "atr", "adx",
-            "cci", "roc", "momentum", "bollinger", "vwap", "obv", "ichimoku", "psar",
+            "sma",
+            "ema",
+            "wma",
+            "rsi",
+            "macd",
+            "stochastic",
+            "atr",
+            "adx",
+            "cci",
+            "roc",
+            "momentum",
+            "bollinger",
+            "vwap",
+            "obv",
+            "ichimoku",
+            "psar",
         } <= set(names)
 
     def test_build_indicator_default(self):
@@ -257,4 +269,6 @@ class TestLengthsAndAlignment:
             for key, series in out.items():
                 if name == "ichimoku" and key in ("displacement", "chikou"):
                     continue
-                assert len(series) == len(candles_), f"{name}.{key} length {len(series)} != {len(candles_)}"
+                assert len(series) == len(candles_), (
+                    f"{name}.{key} length {len(series)} != {len(candles_)}"
+                )

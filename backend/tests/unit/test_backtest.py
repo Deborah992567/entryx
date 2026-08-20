@@ -15,12 +15,16 @@ from app.services.market_data import Candle
 from app.services.strategy import Strategy, register_strategy
 
 
-def candle(ts: datetime, o: float, h: float, low: float, c: float, symbol: str = "EURUSD") -> Candle:
+def candle(
+    ts: datetime, o: float, h: float, low: float, c: float, symbol: str = "EURUSD"
+) -> Candle:
     return Candle(symbol=symbol, timeframe="H1", ts=ts, o=o, h=h, low=low, c=c, v=100.0)
 
 
 def candles_for(closes: list[tuple[float, float, float, float]], start: datetime) -> list[Candle]:
-    return [candle(start + timedelta(hours=i), o, h, low, c) for i, (o, h, low, c) in enumerate(closes)]
+    return [
+        candle(start + timedelta(hours=i), o, h, low, c) for i, (o, h, low, c) in enumerate(closes)
+    ]
 
 
 def config(**overrides) -> BacktestConfig:
@@ -68,7 +72,9 @@ class PlaceTrail(Strategy):
             )
         elif self._step == 2:
             for position in self.context.positions:
-                self.context.broker.modify_position(position.id, trail=self.params.get("trail", 1.0))
+                self.context.broker.modify_position(
+                    position.id, trail=self.params.get("trail", 1.0)
+                )
 
 
 class HugeOrder(Strategy):
@@ -96,7 +102,12 @@ register_strategy(HugeOrder)
 
 def test_market_order_fills_at_next_bar_open() -> None:
     series = candles_for(
-        [(100.0, 100.5, 99.5, 100.0), (100.0, 100.5, 99.5, 100.0), (101.0, 101.5, 100.5, 101.0), (100.0, 100.5, 99.5, 100.0)],
+        [
+            (100.0, 100.5, 99.5, 100.0),
+            (100.0, 100.5, 99.5, 100.0),
+            (101.0, 101.5, 100.5, 101.0),
+            (100.0, 100.5, 99.5, 100.0),
+        ],
         datetime(2024, 1, 1, tzinfo=UTC),
     )
     result = run_backtest(
@@ -119,11 +130,20 @@ def test_equity_curve_has_one_point_per_bar() -> None:
         [(100.0, 100.5, 99.5, 100.0)] * 12,
         datetime(2024, 1, 1, tzinfo=UTC),
     )
-    result = run_backtest(strategy_name="bt_place_first_bar", symbol="EURUSD", candles=series, config=config())
+    result = run_backtest(
+        strategy_name="bt_place_first_bar", symbol="EURUSD", candles=series, config=config()
+    )
     assert len(result["equity_curve"]) == len(series)
     assert result["equity_curve"][0]["equity"] == pytest.approx(100_000.0)
     assert result["metrics"]["total_trades"] == 1
-    for key in ("win_rate", "profit_factor", "expectancy", "max_drawdown", "max_drawdown_pct", "sharpe"):
+    for key in (
+        "win_rate",
+        "profit_factor",
+        "expectancy",
+        "max_drawdown",
+        "max_drawdown_pct",
+        "sharpe",
+    ):
         assert key in result["metrics"]
 
 
@@ -146,7 +166,9 @@ def test_unknown_strategy_raises_keyerror() -> None:
 
 def test_empty_series_raises() -> None:
     with pytest.raises(ValueError):
-        run_backtest(strategy_name="bt_place_first_bar", symbol="EURUSD", candles=[], config=config())
+        run_backtest(
+            strategy_name="bt_place_first_bar", symbol="EURUSD", candles=[], config=config()
+        )
 
 
 # -- commission / spread / slippage / margin ---------------------------------
@@ -201,7 +223,9 @@ def test_slippage_moves_fill_price_adversely() -> None:
 
 def test_margin_rejects_oversized_order() -> None:
     series = candles_for([(100.0, 100.5, 99.5, 100.0)] * 3, datetime(2024, 1, 1, tzinfo=UTC))
-    result = run_backtest(strategy_name="bt_huge_order", symbol="EURUSD", candles=series, config=config())
+    result = run_backtest(
+        strategy_name="bt_huge_order", symbol="EURUSD", candles=series, config=config()
+    )
     assert result["trades"] == []
     assert result["metrics"]["total_trades"] == 0
 
@@ -340,7 +364,9 @@ def test_swap_disabled_is_zero() -> None:
 def test_broker_pending_limit_fills_intrabar() -> None:
     series = candles_for([(100.0, 100.5, 99.5, 100.0)] * 3, datetime(2024, 1, 1, tzinfo=UTC))
     broker = BacktestBroker(config(), series)
-    broker.place_order(OrderRequest(symbol="EURUSD", side="buy", type="limit", volume=0.1, price=99.5))
+    broker.place_order(
+        OrderRequest(symbol="EURUSD", side="buy", type="limit", volume=0.1, price=99.5)
+    )
     assert broker.pending_orders()
     events = broker.on_bar(series[0])
     assert events[0][0] == "order.filled"
@@ -353,7 +379,9 @@ def test_broker_stop_order_fills_on_breakout() -> None:
         datetime(2024, 1, 1, tzinfo=UTC),
     )
     broker = BacktestBroker(config(), series)
-    broker.place_order(OrderRequest(symbol="EURUSD", side="buy", type="stop", volume=0.1, price=101.5))
+    broker.place_order(
+        OrderRequest(symbol="EURUSD", side="buy", type="stop", volume=0.1, price=101.5)
+    )
     events = broker.on_bar(series[0])
     assert events == []
     events = broker.on_bar(series[1])
@@ -362,11 +390,16 @@ def test_broker_stop_order_fills_on_breakout() -> None:
 
 
 def test_broker_equity_tracks_floating_pnl() -> None:
-    series = candles_for([(100.0, 100.5, 99.5, 100.0), (102.0, 102.5, 101.5, 102.0)], datetime(2024, 1, 1, tzinfo=UTC))
+    series = candles_for(
+        [(100.0, 100.5, 99.5, 100.0), (102.0, 102.5, 101.5, 102.0)],
+        datetime(2024, 1, 1, tzinfo=UTC),
+    )
     broker = BacktestBroker(config(), series)
     broker.place_order(OrderRequest(symbol="EURUSD", side="buy", type="market", volume=1.0))
     broker.on_bar(series[0])
-    assert broker.equity(series[0].ts) == pytest.approx(100_000.0 - 2_000.0)  # entry commission deducted
+    assert broker.equity(series[0].ts) == pytest.approx(
+        100_000.0 - 2_000.0
+    )  # entry commission deducted
     assert broker.floating_pnl_total() == pytest.approx(0.0)
     broker.on_bar(series[1])
     assert broker.floating_pnl_total() == pytest.approx(200_000.0)  # (102 - 100) * 100k * 1 lot

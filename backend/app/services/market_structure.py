@@ -81,15 +81,21 @@ def _swing_strength(candles: list[Candle], i: int, kind: str) -> float:
     return max(0.0, min(1.0, ratio))
 
 
-def detect_swings(candles: list[Candle], *, left: int = SWING_LEFT, right: int = SWING_RIGHT) -> list[StructureObject]:
+def detect_swings(
+    candles: list[Candle], *, left: int = SWING_LEFT, right: int = SWING_RIGHT
+) -> list[StructureObject]:
     """Find swing highs/lows using left/right fractal confirmation bars."""
     if left < 1 or right < 0:
         raise ValueError("left must be >= 1 and right must be >= 0")
     n = len(candles)
     out: list[StructureObject] = []
     for i in range(left, n - right):
-        high_is_swing = all(candles[i].h > candles[j].h for j in range(i - left, i + right + 1) if j != i)
-        low_is_swing = all(candles[i].low < candles[j].low for j in range(i - left, i + right + 1) if j != i)
+        high_is_swing = all(
+            candles[i].h > candles[j].h for j in range(i - left, i + right + 1) if j != i
+        )
+        low_is_swing = all(
+            candles[i].low < candles[j].low for j in range(i - left, i + right + 1) if j != i
+        )
         if high_is_swing:
             out.append(
                 StructureObject(
@@ -118,7 +124,9 @@ def detect_swings(candles: list[Candle], *, left: int = SWING_LEFT, right: int =
     return out
 
 
-def classify_structure(candles: list[Candle], swings: list[StructureObject] | None = None) -> list[StructureObject]:
+def classify_structure(
+    candles: list[Candle], swings: list[StructureObject] | None = None
+) -> list[StructureObject]:
     """Label swing sequence as HH/HL/LH/LL.
 
     The first swing of each polarity stays unlabeled (``swing_high`` /
@@ -177,7 +185,9 @@ def _regime_from(last_high: StructureObject | None, last_low: StructureObject | 
     return "range"
 
 
-def _break_strength(candles: list[Candle], bar_index: int, level: float, *, lookback: int = LOOKBACK) -> float:
+def _break_strength(
+    candles: list[Candle], bar_index: int, level: float, *, lookback: int = LOOKBACK
+) -> float:
     """0..1 closeness of a break relative to recent average candle range."""
     lo = max(0, bar_index - lookback)
     window = candles[lo:bar_index]
@@ -187,7 +197,12 @@ def _break_strength(candles: list[Candle], bar_index: int, level: float, *, look
     return min(1.0, abs(candles[bar_index].c - level) / avg)
 
 
-def detect_bos(candles: list[Candle], structure: list[StructureObject] | None = None, *, right: int = SWING_RIGHT) -> list[StructureObject]:
+def detect_bos(
+    candles: list[Candle],
+    structure: list[StructureObject] | None = None,
+    *,
+    right: int = SWING_RIGHT,
+) -> list[StructureObject]:
     """Break of Structure — close beyond the last swing in the prevailing trend.
 
     In an uptrend a close that crosses above the most recent confirmed swing
@@ -252,7 +267,12 @@ def detect_bos(candles: list[Candle], structure: list[StructureObject] | None = 
     return out
 
 
-def detect_choch(candles: list[Candle], structure: list[StructureObject] | None = None, *, right: int = SWING_RIGHT) -> list[StructureObject]:
+def detect_choch(
+    candles: list[Candle],
+    structure: list[StructureObject] | None = None,
+    *,
+    right: int = SWING_RIGHT,
+) -> list[StructureObject]:
     """Change of Character — close against the prevailing trend's structure.
 
     In an uptrend a close that crosses below the most recent confirmed swing
@@ -322,7 +342,13 @@ def detect_choch(candles: list[Candle], structure: list[StructureObject] | None 
 # ---------------------------------------------------------------------------
 
 
-def _regime_at(bar_index: int, structure: list[StructureObject], *, window: int = REGIME_WINDOW, right: int = SWING_RIGHT) -> str:
+def _regime_at(
+    bar_index: int,
+    structure: list[StructureObject],
+    *,
+    window: int = REGIME_WINDOW,
+    right: int = SWING_RIGHT,
+) -> str:
     """Majority vote over the last ``window`` labels confirmed by ``bar_index``."""
     recent = [s for s in structure if s.bar_index + right <= bar_index][-window:]
     bull = sum(1 for s in recent if s.kind in {"hh", "hl"})
@@ -334,7 +360,13 @@ def _regime_at(bar_index: int, structure: list[StructureObject], *, window: int 
     return "range"
 
 
-def detect_regime_changes(candles: list[Candle], structure: list[StructureObject] | None = None, *, window: int = REGIME_WINDOW, right: int = SWING_RIGHT) -> list[StructureObject]:
+def detect_regime_changes(
+    candles: list[Candle],
+    structure: list[StructureObject] | None = None,
+    *,
+    window: int = REGIME_WINDOW,
+    right: int = SWING_RIGHT,
+) -> list[StructureObject]:
     """Emit a ``regime`` object every time the trend/range regime flips."""
     structure = structure or classify_structure(candles)
     out: list[StructureObject] = []
@@ -445,7 +477,11 @@ def detect_breakouts_and_retests(
                     direction="bullish",
                     strength=_break_strength(candles, i, last_high.price),
                     invalidation_price=last_high.price,
-                    meta={"broken": last_high.kind, "broken_price": last_high.price, "broken_bar": last_high.bar_index},
+                    meta={
+                        "broken": last_high.kind,
+                        "broken_price": last_high.price,
+                        "broken_bar": last_high.bar_index,
+                    },
                 )
             )
             active = ("bullish", last_high.price, i)
@@ -460,7 +496,11 @@ def detect_breakouts_and_retests(
                     direction="bearish",
                     strength=_break_strength(candles, i, last_low.price),
                     invalidation_price=last_low.price,
-                    meta={"broken": last_low.kind, "broken_price": last_low.price, "broken_bar": last_low.bar_index},
+                    meta={
+                        "broken": last_low.kind,
+                        "broken_price": last_low.price,
+                        "broken_bar": last_low.bar_index,
+                    },
                 )
             )
             active = ("bearish", last_low.price, i)
@@ -472,13 +512,34 @@ def detect_breakouts_and_retests(
 # ---------------------------------------------------------------------------
 
 
-def analyze(candles: list[Candle], *, left: int = SWING_LEFT, right: int = SWING_RIGHT, window: int = REGIME_WINDOW, min_bars: int = BREAKOUT_MIN_BARS) -> dict:
+def analyze(
+    candles: list[Candle],
+    *,
+    left: int = SWING_LEFT,
+    right: int = SWING_RIGHT,
+    window: int = REGIME_WINDOW,
+    min_bars: int = BREAKOUT_MIN_BARS,
+) -> dict:
     """Run every detector over ``candles`` and return a serializable summary."""
     if not candles:
-        return {"symbol": "", "timeframe": "", "candles": 0, "left": left, "right": right, "swings": [], "bos": [], "choch": [], "regimes": [], "breakouts": [], "retests": []}
+        return {
+            "symbol": "",
+            "timeframe": "",
+            "candles": 0,
+            "left": left,
+            "right": right,
+            "swings": [],
+            "bos": [],
+            "choch": [],
+            "regimes": [],
+            "breakouts": [],
+            "retests": [],
+        }
     swings = detect_swings(candles, left=left, right=right)
     structure = classify_structure(candles, swings)
-    breakouts, retests = detect_breakouts_and_retests(candles, structure, min_bars=min_bars, right=right)
+    breakouts, retests = detect_breakouts_and_retests(
+        candles, structure, min_bars=min_bars, right=right
+    )
     return {
         "symbol": candles[0].symbol,
         "timeframe": candles[0].timeframe,
@@ -488,7 +549,10 @@ def analyze(candles: list[Candle], *, left: int = SWING_LEFT, right: int = SWING
         "swings": [structure_to_dict(s) for s in structure],
         "bos": [structure_to_dict(s) for s in detect_bos(candles, structure, right=right)],
         "choch": [structure_to_dict(s) for s in detect_choch(candles, structure, right=right)],
-        "regimes": [structure_to_dict(s) for s in detect_regime_changes(candles, structure, window=window, right=right)],
+        "regimes": [
+            structure_to_dict(s)
+            for s in detect_regime_changes(candles, structure, window=window, right=right)
+        ],
         "breakouts": [structure_to_dict(s) for s in breakouts],
         "retests": [structure_to_dict(s) for s in retests],
     }

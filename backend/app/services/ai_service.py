@@ -9,17 +9,16 @@ signals — it explains what the data shows.
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
 from app.db.models.ai import AIAnalysis, AIConversation, AIMessage
 from app.providers.ai import get_ai_provider
-from app.providers.ai.base import AIModelInfo, AIProvider, AIMessage as ProviderMsg
+from app.providers.ai.base import AIMessage as ProviderMsg
+from app.providers.ai.base import AIProvider
 from app.services.market_data import market_data
 from app.services.market_structure import analyze as analyze_structure
 from app.services.smc_objects import analyze_smc
-
 
 SYSTEM_PROMPT = """You are EntryX AI Copilot — a trading assistant grounded in real market data.
 
@@ -135,7 +134,9 @@ class AIService:
             parts.append(f"Market structure: {regime}")
             if structure.get("bos"):
                 last_bos = structure["bos"][-1]
-                parts.append(f"Last BOS: {last_bos.get('direction', '?')} at {last_bos.get('price', '?')}")
+                parts.append(
+                    f"Last BOS: {last_bos.get('direction', '?')} at {last_bos.get('price', '?')}"
+                )
         except Exception:
             pass
 
@@ -370,15 +371,17 @@ class AIService:
         ]
         if entry_price is not None:
             prompt_parts.append(f"Entry price: {entry_price}")
-        prompt_parts.extend([
-            "Identify:\n"
-            "1. Key stop-loss levels based on structure\n"
-            "2. Nearest take-profit targets\n"
-            "3. Risk/reward ratio estimation\n"
-            "4. Volatility and drawdown risk\n"
-            "5. Structural invalidation levels\n"
-            "Include a mandatory risk warning.",
-        ])
+        prompt_parts.extend(
+            [
+                "Identify:\n"
+                "1. Key stop-loss levels based on structure\n"
+                "2. Nearest take-profit targets\n"
+                "3. Risk/reward ratio estimation\n"
+                "4. Volatility and drawdown risk\n"
+                "5. Structural invalidation levels\n"
+                "Include a mandatory risk warning.",
+            ]
+        )
         messages = [
             ProviderMsg(role="system", content=SYSTEM_PROMPT),
             ProviderMsg(role="system", content=f"Market data:\n{context}"),
@@ -390,10 +393,14 @@ class AIService:
             symbol=symbol,
             timeframe=timeframe,
             kind="risk_copilot",
-            input_json=json.dumps({
-                "symbol": symbol, "timeframe": timeframe,
-                "entry_price": entry_price, "direction": direction,
-            }),
+            input_json=json.dumps(
+                {
+                    "symbol": symbol,
+                    "timeframe": timeframe,
+                    "entry_price": entry_price,
+                    "direction": direction,
+                }
+            ),
             output_json=json.dumps({"content": response.content}),
             model=response.model,
         )

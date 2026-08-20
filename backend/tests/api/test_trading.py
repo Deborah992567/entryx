@@ -137,7 +137,14 @@ def test_expiry_in_past_returns_400(client: TestClient, auth_headers: dict) -> N
     resp = client.post(
         "/api/v1/trading/orders",
         headers=auth_headers,
-        json={"symbol": "EURUSD", "side": "buy", "type": "limit", "volume": 0.5, "price": 1.0, "expiry": "2020-01-01T00:00:00Z"},
+        json={
+            "symbol": "EURUSD",
+            "side": "buy",
+            "type": "limit",
+            "volume": 0.5,
+            "price": 1.0,
+            "expiry": "2020-01-01T00:00:00Z",
+        },
     )
     assert resp.status_code == 400
 
@@ -157,7 +164,14 @@ def test_invalid_stop_limit_returns_400(client: TestClient, auth_headers: dict) 
     resp = client.post(
         "/api/v1/trading/orders",
         headers=auth_headers,
-        json={"symbol": "EURUSD", "side": "buy", "type": "stop_limit", "volume": 0.5, "price": stop, "limit_price": round(stop - 0.1, 5)},
+        json={
+            "symbol": "EURUSD",
+            "side": "buy",
+            "type": "stop_limit",
+            "volume": 0.5,
+            "price": stop,
+            "limit_price": round(stop - 0.1, 5),
+        },
     )
     assert resp.status_code == 400
 
@@ -215,7 +229,9 @@ def test_modify_position_invalid_returns_400(client: TestClient, auth_headers: d
     position_id = client.get("/api/v1/trading/positions", headers=auth_headers).json()[0]["id"]
     quote = client.get("/api/v1/market/quote?symbol=EURUSD", headers=auth_headers).json()
     bad_sl = round(quote["bid"] + 1.0, 5)
-    resp = client.patch(f"/api/v1/trading/positions/{position_id}", headers=auth_headers, json={"sl": bad_sl})
+    resp = client.patch(
+        f"/api/v1/trading/positions/{position_id}", headers=auth_headers, json={"sl": bad_sl}
+    )
     assert resp.status_code == 400
 
 
@@ -241,7 +257,14 @@ def test_risk_assess_endpoint(client: TestClient, auth_headers: dict) -> None:
     resp = client.post(
         "/api/v1/trading/risk/assess",
         headers=auth_headers,
-        json={"symbol": "EURUSD", "equity": 10_000, "risk_pct": 2, "entry": 1.10, "sl": 1.09, "tp": 1.13},
+        json={
+            "symbol": "EURUSD",
+            "equity": 10_000,
+            "risk_pct": 2,
+            "entry": 1.10,
+            "sl": 1.09,
+            "tp": 1.13,
+        },
     )
     assert resp.status_code == 200, resp.text
     data = resp.json()

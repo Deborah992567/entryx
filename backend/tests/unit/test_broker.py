@@ -52,7 +52,6 @@ class FakeProvider:
         self._price = price
 
 
-
 def test_default_account_is_paper(broker: PaperBroker) -> None:
     account = broker.account()
     assert account.number == "0001-PAPER"
@@ -157,7 +156,9 @@ def test_stop_limit_pending_then_triggers_then_fills() -> None:
     provider = FakeProvider(1.09)
     broker = PaperBroker(provider)
     order = broker.place_order(
-        OrderRequest(symbol="EURUSD", side="buy", type="stop_limit", volume=0.5, price=1.10, limit_price=1.11)
+        OrderRequest(
+            symbol="EURUSD", side="buy", type="stop_limit", volume=0.5, price=1.10, limit_price=1.11
+        )
     )
     assert order.state == "pending"
     assert order.limit_price == 1.11
@@ -182,7 +183,14 @@ def test_stop_limit_immediately_crossed_fills() -> None:
     provider = FakeProvider(1.09)
     broker = PaperBroker(provider)
     order = broker.place_order(
-        OrderRequest(symbol="EURUSD", side="buy", type="stop_limit", volume=0.5, price=1.085, limit_price=1.10)
+        OrderRequest(
+            symbol="EURUSD",
+            side="buy",
+            type="stop_limit",
+            volume=0.5,
+            price=1.085,
+            limit_price=1.10,
+        )
     )
     assert order.state == "filled"
     assert order.filled_price == pytest.approx(1.10)
@@ -192,14 +200,30 @@ def test_stop_limit_immediately_crossed_fills() -> None:
 def test_stop_limit_requires_limit_price_and_valid_side() -> None:
     broker = PaperBroker(FakeProvider(1.09))
     with pytest.raises(InvalidOrderError):
-        broker.place_order(OrderRequest(symbol="EURUSD", side="buy", type="stop_limit", volume=1, price=1.10))
-    with pytest.raises(InvalidOrderError):
         broker.place_order(
-            OrderRequest(symbol="EURUSD", side="buy", type="stop_limit", volume=1, price=1.10, limit_price=1.05)
+            OrderRequest(symbol="EURUSD", side="buy", type="stop_limit", volume=1, price=1.10)
         )
     with pytest.raises(InvalidOrderError):
         broker.place_order(
-            OrderRequest(symbol="EURUSD", side="sell", type="stop_limit", volume=1, price=1.10, limit_price=1.15)
+            OrderRequest(
+                symbol="EURUSD",
+                side="buy",
+                type="stop_limit",
+                volume=1,
+                price=1.10,
+                limit_price=1.05,
+            )
+        )
+    with pytest.raises(InvalidOrderError):
+        broker.place_order(
+            OrderRequest(
+                symbol="EURUSD",
+                side="sell",
+                type="stop_limit",
+                volume=1,
+                price=1.10,
+                limit_price=1.15,
+            )
         )
 
 
@@ -208,7 +232,9 @@ def test_expiry_transitions_pending_to_expired() -> None:
     broker = PaperBroker(provider)
     expiry = datetime.now(UTC) + timedelta(minutes=1)
     order = broker.place_order(
-        OrderRequest(symbol="EURUSD", side="buy", type="limit", volume=0.5, price=1.05, expiry=expiry)
+        OrderRequest(
+            symbol="EURUSD", side="buy", type="limit", volume=0.5, price=1.05, expiry=expiry
+        )
     )
     assert order.state == "pending"
     assert broker.on_quote("EURUSD") == []  # not yet expired
@@ -236,13 +262,21 @@ def test_expiry_must_be_in_future() -> None:
 def test_sl_tp_validation() -> None:
     broker = PaperBroker(FakeProvider(1.09))
     with pytest.raises(InvalidOrderError):
-        broker.place_order(OrderRequest(symbol="EURUSD", side="buy", type="market", volume=1, sl=1.10))
+        broker.place_order(
+            OrderRequest(symbol="EURUSD", side="buy", type="market", volume=1, sl=1.10)
+        )
     with pytest.raises(InvalidOrderError):
-        broker.place_order(OrderRequest(symbol="EURUSD", side="buy", type="market", volume=1, tp=1.08))
+        broker.place_order(
+            OrderRequest(symbol="EURUSD", side="buy", type="market", volume=1, tp=1.08)
+        )
     with pytest.raises(InvalidOrderError):
-        broker.place_order(OrderRequest(symbol="EURUSD", side="sell", type="market", volume=1, sl=1.08))
+        broker.place_order(
+            OrderRequest(symbol="EURUSD", side="sell", type="market", volume=1, sl=1.08)
+        )
     with pytest.raises(InvalidOrderError):
-        broker.place_order(OrderRequest(symbol="EURUSD", side="sell", type="market", volume=1, tp=1.10))
+        broker.place_order(
+            OrderRequest(symbol="EURUSD", side="sell", type="market", volume=1, tp=1.10)
+        )
     with pytest.raises(InvalidOrderError):
         broker.place_order(
             OrderRequest(symbol="EURUSD", side="buy", type="market", volume=1, sl=1.10, tp=1.11)

@@ -30,7 +30,9 @@ class Order(Base, TimestampMixin):
     entry_price: Mapped[float | None] = mapped_column(Numeric(24, 8), nullable=True)
     sl: Mapped[float | None] = mapped_column(Numeric(24, 8), nullable=True)
     tp: Mapped[float | None] = mapped_column(Numeric(24, 8), nullable=True)
-    state: Mapped[str] = mapped_column(String(20), default="pending")  # pending|filled|cancelled|expired|rejected
+    state: Mapped[str] = mapped_column(
+        String(20), default="pending"
+    )  # pending|filled|cancelled|expired|rejected
     fill_price: Mapped[float | None] = mapped_column(Numeric(24, 8), nullable=True)
     filled_volume: Mapped[float] = mapped_column(Numeric(24, 8), default=0)
     magic: Mapped[int] = mapped_column(Integer, default=0)

@@ -124,7 +124,15 @@ class StrategyContext:
 
     # -- trading --------------------------------------------------------------
 
-    def emit_signal(self, side: SignalSide, reason: str, *, price: float | None = None, strength: float = 1.0, **meta: object) -> Signal:
+    def emit_signal(
+        self,
+        side: SignalSide,
+        reason: str,
+        *,
+        price: float | None = None,
+        strength: float = 1.0,
+        **meta: object,
+    ) -> Signal:
         signal = Signal(
             symbol=self.symbol,
             side=side,
@@ -192,7 +200,9 @@ class StrategyRunner:
         self.last_error: str = ""
         self.signals: list[Signal] = []
         self.orders_placed = 0
-        self.context = StrategyContext(self, provider=provider, symbol=symbol, magic=magic, broker=broker)
+        self.context = StrategyContext(
+            self, provider=provider, symbol=symbol, magic=magic, broker=broker
+        )
 
     # -- lifecycle ------------------------------------------------------------
 

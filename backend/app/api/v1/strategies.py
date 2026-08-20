@@ -22,16 +22,22 @@ router = APIRouter(prefix="/strategies", tags=["strategies"])
 
 
 @router.get("", response_model=list[StrategyInfoOut])
-def list_strategies(_user: User = Depends(get_current_user), _db: Session = Depends(get_db)) -> list[dict]:
+def list_strategies(
+    _user: User = Depends(get_current_user), _db: Session = Depends(get_db)
+) -> list[dict]:
     return strategy_engine.catalog()
 
 
 @router.get("/instances", response_model=list[StrategyInstanceOut])
-def list_instances(user: User = Depends(get_current_user), _db: Session = Depends(get_db)) -> list[dict]:
+def list_instances(
+    user: User = Depends(get_current_user), _db: Session = Depends(get_db)
+) -> list[dict]:
     return strategy_engine.instances(user.id)
 
 
-@router.post("/{name}/start", response_model=StrategyInstanceOut, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/{name}/start", response_model=StrategyInstanceOut, status_code=status.HTTP_201_CREATED
+)
 def start_strategy(
     name: str,
     body: StrategyStart,

@@ -149,7 +149,9 @@ async def cancel_order(user_id: int, order_id: str) -> BrokerOrder:
     return order
 
 
-async def close_position(user_id: int, position_id: str, volume: float | None = None) -> ClosedTrade:
+async def close_position(
+    user_id: int, position_id: str, volume: float | None = None
+) -> ClosedTrade:
     broker = get_broker(user_id)
     trade = broker.close_position(position_id, volume=volume)
     await manager.broadcast("positions", "position.closed", to_trade_out(trade))
@@ -181,12 +183,18 @@ async def process_market(symbol: str) -> None:
                 position = broker.position(payload.id.replace("o-", "p-"))
                 quote = market_data.quote(position.symbol)
                 pnl = broker.floating_pnl(position, quote)
-                await manager.broadcast("positions", "position.opened", to_position_out(position, pnl))
-                await manager.broadcast(f"account.{user_id}", "account.updated", account_summary(user_id))
+                await manager.broadcast(
+                    "positions", "position.opened", to_position_out(position, pnl)
+                )
+                await manager.broadcast(
+                    f"account.{user_id}", "account.updated", account_summary(user_id)
+                )
             elif kind == "order.expired":
                 await manager.broadcast("orders", "order.expired", to_order_out(payload))
             elif kind == "position.closed":
                 await manager.broadcast("positions", "position.closed", to_trade_out(payload))
                 await manager.broadcast("history", "trade.closed", to_trade_out(payload))
-                await manager.broadcast(f"account.{user_id}", "account.updated", account_summary(user_id))
+                await manager.broadcast(
+                    f"account.{user_id}", "account.updated", account_summary(user_id)
+                )
     strategy_engine.feed_quote(symbol)

@@ -124,7 +124,10 @@ def detect_fvg(candles: list[Candle], *, lookback: int = ATR_LOOKBACK) -> list[S
                     meta={"body": cur.c - cur.o},
                 )
             )
-    return [gap if not _fvg_filled(candles, gap) else _replaced(gap, status="filled") for gap in candidates]
+    return [
+        gap if not _fvg_filled(candles, gap) else _replaced(gap, status="filled")
+        for gap in candidates
+    ]
 
 
 def _fvg_filled(candles: list[Candle], gap: SmcObject) -> bool:
@@ -145,7 +148,9 @@ def _replaced(obj: SmcObject, **changes) -> SmcObject:
     return SmcObject(**fields)
 
 
-def _strength_vs_range(candles: list[Candle], bar_index: int, size: float, *, lookback: int) -> float:
+def _strength_vs_range(
+    candles: list[Candle], bar_index: int, size: float, *, lookback: int
+) -> float:
     """0..1 size of ``size`` relative to recent average candle range."""
     avg = _avg_range(candles, bar_index, lookback=lookback)
     if avg <= 0:
@@ -158,7 +163,9 @@ def _strength_vs_range(candles: list[Candle], bar_index: int, size: float, *, lo
 # ---------------------------------------------------------------------------
 
 
-def detect_displacement(candles: list[Candle], *, lookback: int = ATR_LOOKBACK, mult: float = DISPLACEMENT_MULT) -> list[SmcObject]:
+def detect_displacement(
+    candles: list[Candle], *, lookback: int = ATR_LOOKBACK, mult: float = DISPLACEMENT_MULT
+) -> list[SmcObject]:
     """Impulse candles whose range and body both exceed the norm.
 
     A candle is displacement if its full range is more than ``mult`` times the
@@ -197,7 +204,13 @@ def detect_displacement(candles: list[Candle], *, lookback: int = ATR_LOOKBACK, 
 # ---------------------------------------------------------------------------
 
 
-def detect_liquidity_pools(candles: list[Candle], structure: list[StructureObject] | None = None, *, tolerance: float = LIQUIDITY_TOLERANCE, min_touches: int = LIQUIDITY_MIN_TOUCHES) -> list[SmcObject]:
+def detect_liquidity_pools(
+    candles: list[Candle],
+    structure: list[StructureObject] | None = None,
+    *,
+    tolerance: float = LIQUIDITY_TOLERANCE,
+    min_touches: int = LIQUIDITY_MIN_TOUCHES,
+) -> list[SmcObject]:
     """Group near-equal swings into EQH (equal highs) / EQL (equal lows) pools.
 
     Consecutive swing highs within ``tolerance`` of each other cluster into one
@@ -209,16 +222,28 @@ def detect_liquidity_pools(candles: list[Candle], structure: list[StructureObjec
     structure = structure or classify_structure(candles)
     highs = [s for s in structure if s.kind in {"swing_high", "hh", "lh"}]
     lows = [s for s in structure if s.kind in {"swing_low", "hl", "ll"}]
-    pools = [*_group_pools(candles, highs, "eqh", tolerance, min_touches), *_group_pools(candles, lows, "eql", tolerance, min_touches)]
+    pools = [
+        *_group_pools(candles, highs, "eqh", tolerance, min_touches),
+        *_group_pools(candles, lows, "eql", tolerance, min_touches),
+    ]
     pools.sort(key=lambda p: (p.bar_index, p.kind))
     return pools
 
 
-def _group_pools(candles: list[Candle], swings: list[StructureObject], kind: str, tolerance: float, min_touches: int) -> list[SmcObject]:
+def _group_pools(
+    candles: list[Candle],
+    swings: list[StructureObject],
+    kind: str,
+    tolerance: float,
+    min_touches: int,
+) -> list[SmcObject]:
     out: list[SmcObject] = []
     group: list[StructureObject] = []
     for swing in swings:
-        if not group or abs(swing.price - group[0].price) / max(abs(group[0].price), 1e-12) <= tolerance:
+        if (
+            not group
+            or abs(swing.price - group[0].price) / max(abs(group[0].price), 1e-12) <= tolerance
+        ):
             group.append(swing)
             continue
         if len(group) >= min_touches:
@@ -235,7 +260,10 @@ def _pool_object(candles: list[Candle], group: list[StructureObject], kind: str)
     last = group[-1]
     touches = [s.bar_index for s in group]
     if kind == "eqh":
-        direction, invalidation = "bearish", low  # sell liquidity rests above; below low voids the pool
+        direction, invalidation = (
+            "bearish",
+            low,
+        )  # sell liquidity rests above; below low voids the pool
     else:
         direction, invalidation = "bullish", high
     return SmcObject(
@@ -252,7 +280,9 @@ def _pool_object(candles: list[Candle], group: list[StructureObject], kind: str)
     )
 
 
-def detect_sweeps(candles: list[Candle], pools: list[SmcObject] | None = None, *, lookback: int = ATR_LOOKBACK) -> list[SmcObject]:
+def detect_sweeps(
+    candles: list[Candle], pools: list[SmcObject] | None = None, *, lookback: int = ATR_LOOKBACK
+) -> list[SmcObject]:
     """Liquidity grabs: pierce a pool boundary, then close back inside.
 
     A sell-side sweep pierces above an EQH pool (taking the resting stops) and
@@ -276,7 +306,9 @@ def detect_sweeps(candles: list[Candle], pools: list[SmcObject] | None = None, *
                             direction="bearish",
                             range_low=pool.range_high,
                             range_high=bar.h,
-                            strength=_strength_vs_range(candles, i, bar.h - pool.range_high, lookback=lookback),
+                            strength=_strength_vs_range(
+                                candles, i, bar.h - pool.range_high, lookback=lookback
+                            ),
                             invalidation_price=pool.range_low,
                             meta={"pool_kind": "eqh", "pool_bar": pool.bar_index},
                         )
@@ -293,7 +325,9 @@ def detect_sweeps(candles: list[Candle], pools: list[SmcObject] | None = None, *
                             direction="bullish",
                             range_low=bar.low,
                             range_high=pool.range_low,
-                            strength=_strength_vs_range(candles, i, pool.range_low - bar.low, lookback=lookback),
+                            strength=_strength_vs_range(
+                                candles, i, pool.range_low - bar.low, lookback=lookback
+                            ),
                             invalidation_price=pool.range_high,
                             meta={"pool_kind": "eql", "pool_bar": pool.bar_index},
                         )
@@ -308,7 +342,9 @@ def detect_sweeps(candles: list[Candle], pools: list[SmcObject] | None = None, *
 # ---------------------------------------------------------------------------
 
 
-def detect_order_blocks(candles: list[Candle], displacement: list[SmcObject] | None = None, *, lookback: int = 5) -> list[SmcObject]:
+def detect_order_blocks(
+    candles: list[Candle], displacement: list[SmcObject] | None = None, *, lookback: int = 5
+) -> list[SmcObject]:
     """Last opposite candle before a displacement that ignites a move.
 
     For each bullish displacement the order block is the most recent bearish
@@ -347,7 +383,9 @@ def detect_order_blocks(candles: list[Candle], displacement: list[SmcObject] | N
     return [_mark_order_block_status(candles, block) for block in out]
 
 
-def _last_opposite_candle(candles: list[Candle], until: int, direction: str, lookback: int) -> int | None:
+def _last_opposite_candle(
+    candles: list[Candle], until: int, direction: str, lookback: int
+) -> int | None:
     """Index of the most recent candle before ``until`` with opposite direction."""
     for i in range(until - 1, max(-1, until - lookback - 1), -1):
         bar = candles[i]
@@ -362,9 +400,17 @@ def _mark_order_block_status(candles: list[Candle], block: SmcObject) -> SmcObje
     """Invalidate a block once a close breaches its far boundary."""
     for bar in candles[block.bar_index + 1 :]:
         if block.direction == "bullish" and bar.c < block.invalidation_price:
-            return _replaced(block, status="invalidated", meta={**block.meta, "invalidated_bar": bar_index_of(candles, bar)})
+            return _replaced(
+                block,
+                status="invalidated",
+                meta={**block.meta, "invalidated_bar": bar_index_of(candles, bar)},
+            )
         if block.direction == "bearish" and bar.c > block.invalidation_price:
-            return _replaced(block, status="invalidated", meta={**block.meta, "invalidated_bar": bar_index_of(candles, bar)})
+            return _replaced(
+                block,
+                status="invalidated",
+                meta={**block.meta, "invalidated_bar": bar_index_of(candles, bar)},
+            )
     return block
 
 
@@ -376,7 +422,9 @@ def bar_index_of(candles: list[Candle], target: Candle) -> int:
     raise ValueError("candle not in series")
 
 
-def detect_breaker_blocks(candles: list[Candle], order_blocks: list[SmcObject] | None = None) -> list[SmcObject]:
+def detect_breaker_blocks(
+    candles: list[Candle], order_blocks: list[SmcObject] | None = None
+) -> list[SmcObject]:
     """Swept order blocks that get reclaimed and become fresh levels.
 
     When an order block's far boundary is closed through (the block is
@@ -437,7 +485,9 @@ def detect_breaker_blocks(candles: list[Candle], order_blocks: list[SmcObject] |
 # ---------------------------------------------------------------------------
 
 
-def detect_premium_discount(candles: list[Candle], structure: list[StructureObject] | None = None) -> list[SmcObject]:
+def detect_premium_discount(
+    candles: list[Candle], structure: list[StructureObject] | None = None
+) -> list[SmcObject]:
     """Split the current dealing range into premium and discount halves.
 
     The dealing range is the band between the most recent confirmed swing high
@@ -461,7 +511,13 @@ def detect_premium_discount(candles: list[Candle], structure: list[StructureObje
         "bar_index": anchor.bar_index,
         "strength": 1.0,
         "invalidation_price": mid,
-        "meta": {"dealing_range_low": lo, "dealing_range_high": hi, "midpoint": mid, "swing_high_bar": sh.bar_index, "swing_low_bar": sl.bar_index},
+        "meta": {
+            "dealing_range_low": lo,
+            "dealing_range_high": hi,
+            "midpoint": mid,
+            "swing_high_bar": sh.bar_index,
+            "swing_low_bar": sl.bar_index,
+        },
     }
     return [
         SmcObject(kind="discount", direction="bullish", range_low=lo, range_high=mid, **common),
@@ -484,7 +540,18 @@ def analyze_smc(
 ) -> dict:
     """Run every SMC object detector and return a serializable summary."""
     if not candles:
-        return {"symbol": "", "timeframe": "", "candles": 0, "fvg": [], "displacement": [], "liquidity_pools": [], "sweeps": [], "order_blocks": [], "breaker_blocks": [], "premium_discount": []}
+        return {
+            "symbol": "",
+            "timeframe": "",
+            "candles": 0,
+            "fvg": [],
+            "displacement": [],
+            "liquidity_pools": [],
+            "sweeps": [],
+            "order_blocks": [],
+            "breaker_blocks": [],
+            "premium_discount": [],
+        }
     structure = classify_structure(candles)
     displacement = detect_displacement(candles, lookback=lookback, mult=mult)
     pools = detect_liquidity_pools(candles, structure, tolerance=tolerance, min_touches=min_touches)

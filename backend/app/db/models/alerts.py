@@ -18,4 +18,6 @@ class Alert(Base, TimestampMixin):
     kind: Mapped[str] = mapped_column(String(24), nullable=False)
     condition_json: Mapped[dict] = mapped_column(JSON, default=dict)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    last_triggered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_triggered_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )

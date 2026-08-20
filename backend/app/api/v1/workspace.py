@@ -35,7 +35,11 @@ def create_layout(
     user: User = Depends(get_current_user),
 ) -> ChartLayout:
     return workspace_service.create_layout(
-        db, user_id=user.id, name=body.name, layout_json=body.layout_json, is_default=body.is_default
+        db,
+        user_id=user.id,
+        name=body.name,
+        layout_json=body.layout_json,
+        is_default=body.is_default,
     )
 
 
@@ -46,7 +50,9 @@ def update_layout(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> ChartLayout:
-    return workspace_service.update_layout(db, layout_id=layout_id, user_id=user.id, payload=body.model_dump())
+    return workspace_service.update_layout(
+        db, layout_id=layout_id, user_id=user.id, payload=body.model_dump()
+    )
 
 
 @router.delete("/layouts/{layout_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -65,9 +71,7 @@ def list_drawings(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> list[Drawing]:
-    return drawing_service.list_drawings(
-        db, user_id=user.id, symbol=symbol, timeframe=timeframe
-    )
+    return drawing_service.list_drawings(db, user_id=user.id, symbol=symbol, timeframe=timeframe)
 
 
 @router.put("/drawings", response_model=list[DrawingOut])
@@ -92,6 +96,4 @@ def clear_drawings(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> None:
-    drawing_service.clear_drawings(
-        db, user_id=user.id, symbol=symbol, timeframe=timeframe
-    )
+    drawing_service.clear_drawings(db, user_id=user.id, symbol=symbol, timeframe=timeframe)

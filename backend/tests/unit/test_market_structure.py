@@ -18,10 +18,21 @@ from app.services.market_structure import (
 )
 
 
-def candles(points: list[tuple[float, float, float, float]], symbol: str = "EURUSD") -> list[Candle]:
+def candles(
+    points: list[tuple[float, float, float, float]], symbol: str = "EURUSD"
+) -> list[Candle]:
     start = datetime(2024, 1, 1, tzinfo=UTC)
     return [
-        Candle(symbol=symbol, timeframe="H1", ts=start + timedelta(hours=i), o=o, h=h, low=lo, c=c, v=100.0)
+        Candle(
+            symbol=symbol,
+            timeframe="H1",
+            ts=start + timedelta(hours=i),
+            o=o,
+            h=h,
+            low=lo,
+            c=c,
+            v=100.0,
+        )
         for i, (o, h, lo, c) in enumerate(points)
     ]
 
@@ -52,7 +63,9 @@ def test_detect_swings_finds_local_extrema() -> None:
 def test_detect_swings_requires_confirmation_bars() -> None:
     swings = detect_swings(candles(points([5, 10, 20, 10, 5])), left=1, right=1)
     assert [(s.bar_index, s.kind) for s in swings] == [(2, "swing_high")]
-    assert detect_swings(candles(points([20, 15, 5, 15, 20])), left=1, right=1)[0].kind == "swing_low"
+    assert (
+        detect_swings(candles(points([20, 15, 5, 15, 20])), left=1, right=1)[0].kind == "swing_low"
+    )
 
 
 def test_detect_swings_rejects_bad_params() -> None:
@@ -66,12 +79,16 @@ def test_detect_swings_rejects_bad_params() -> None:
 
 
 def test_classify_uptrend_marks_hh_hl() -> None:
-    kinds = [s.kind for s in classify_structure(candles(U), detect_swings(candles(U), left=1, right=1))]
+    kinds = [
+        s.kind for s in classify_structure(candles(U), detect_swings(candles(U), left=1, right=1))
+    ]
     assert kinds == ["swing_high", "swing_low", "hh", "hl"]
 
 
 def test_classify_downtrend_marks_lh_ll() -> None:
-    kinds = [s.kind for s in classify_structure(candles(D), detect_swings(candles(D), left=1, right=1))]
+    kinds = [
+        s.kind for s in classify_structure(candles(D), detect_swings(candles(D), left=1, right=1))
+    ]
     assert kinds == ["swing_high", "swing_low", "lh", "ll", "lh"]
 
 
@@ -80,7 +97,9 @@ def test_classify_keeps_raw_kind_on_equal_prices() -> None:
     swings = [
         StructureObject(kind="swing_high", bar_index=2, ts=base.ts, price=30.0, timeframe="H1"),
         StructureObject(kind="swing_low", bar_index=4, ts=base.ts, price=20.0, timeframe="H1"),
-        StructureObject(kind="swing_high", bar_index=6, ts=base.ts, price=30.0, timeframe="H1"),  # equal to prior high
+        StructureObject(
+            kind="swing_high", bar_index=6, ts=base.ts, price=30.0, timeframe="H1"
+        ),  # equal to prior high
     ]
     structure = classify_structure(candles(U), swings)
     assert structure[-1].kind == "swing_high"  # not hh/lh
@@ -90,7 +109,11 @@ def test_classify_keeps_raw_kind_on_equal_prices() -> None:
 
 
 def test_bos_bullish_fires_on_cross_of_last_swing_high() -> None:
-    events = detect_bos(candles(U), classify_structure(candles(U), detect_swings(candles(U), left=1, right=1)), right=1)
+    events = detect_bos(
+        candles(U),
+        classify_structure(candles(U), detect_swings(candles(U), left=1, right=1)),
+        right=1,
+    )
     assert len(events) == 1
     event = events[0]
     assert event.kind == "bos"
@@ -102,7 +125,11 @@ def test_bos_bullish_fires_on_cross_of_last_swing_high() -> None:
 
 
 def test_bos_fires_once_per_level() -> None:
-    events = detect_bos(candles(U), classify_structure(candles(U), detect_swings(candles(U), left=1, right=1)), right=1)
+    events = detect_bos(
+        candles(U),
+        classify_structure(candles(U), detect_swings(candles(U), left=1, right=1)),
+        right=1,
+    )
     assert [e.bar_index for e in events] == [10]  # level 45 crossed exactly once
 
 
@@ -118,7 +145,11 @@ def test_choch_bearish_fires_when_uptrend_low_is_broken() -> None:
 
 
 def test_regime_flips_to_uptrend_after_two_bullish_labels() -> None:
-    events = detect_regime_changes(candles(U2), classify_structure(candles(U2), detect_swings(candles(U2), left=1, right=1)), right=1)
+    events = detect_regime_changes(
+        candles(U2),
+        classify_structure(candles(U2), detect_swings(candles(U2), left=1, right=1)),
+        right=1,
+    )
     uptrends = [e for e in events if e.direction == "uptrend"]
     assert uptrends
     assert all(e.kind == "regime" and e.status == "active" for e in events)
@@ -130,7 +161,9 @@ def test_regime_flips_to_uptrend_after_two_bullish_labels() -> None:
 def test_breakout_then_retest_holds() -> None:
     breakouts, retests = detect_breakouts_and_retests(candles(E), min_bars=2, right=1)
     assert [(b.bar_index, b.direction, b.price) for b in breakouts] == [(10, "bullish", 60.0)]
-    assert [(r.bar_index, r.direction, r.price, r.meta["breakout_bar"]) for r in retests] == [(11, "bullish", 45.0, 10)]
+    assert [(r.bar_index, r.direction, r.price, r.meta["breakout_bar"]) for r in retests] == [
+        (11, "bullish", 45.0, 10)
+    ]
     assert breakouts[0].invalidation_price == 45.0
 
 
@@ -151,7 +184,10 @@ def test_analyze_serializes_everything() -> None:
     assert result["candles"] == len(U2)
     for key in ("swings", "bos", "choch", "regimes", "breakouts", "retests"):
         assert key in result
-        assert all("bar_index" in obj and "ts" in obj and "price" in obj and "strength" in obj for obj in result[key])
+        assert all(
+            "bar_index" in obj and "ts" in obj and "price" in obj and "strength" in obj
+            for obj in result[key]
+        )
 
 
 def test_analyze_empty_series_is_safe() -> None:

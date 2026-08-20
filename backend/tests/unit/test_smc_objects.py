@@ -18,10 +18,21 @@ from app.services.smc_objects import (
 )
 
 
-def candles(points: list[tuple[float, float, float, float]], symbol: str = "EURUSD") -> list[Candle]:
+def candles(
+    points: list[tuple[float, float, float, float]], symbol: str = "EURUSD"
+) -> list[Candle]:
     start = datetime(2024, 1, 1, tzinfo=UTC)
     return [
-        Candle(symbol=symbol, timeframe="H1", ts=start + timedelta(hours=i), o=o, h=h, low=lo, c=c, v=100.0)
+        Candle(
+            symbol=symbol,
+            timeframe="H1",
+            ts=start + timedelta(hours=i),
+            o=o,
+            h=h,
+            low=lo,
+            c=c,
+            v=100.0,
+        )
         for i, (o, h, lo, c) in enumerate(points)
     ]
 
@@ -85,12 +96,38 @@ def test_no_displacement_in_quiet_market() -> None:
 
 def test_equal_highs_group_into_eqh_pool() -> None:
     struct = [
-        StructureObject(kind="swing_high", bar_index=5, ts=datetime(2024, 1, 1, tzinfo=UTC), price=100.0, timeframe="H1"),
-        StructureObject(kind="swing_low", bar_index=8, ts=datetime(2024, 1, 1, 8, tzinfo=UTC), price=95.0, timeframe="H1"),
-        StructureObject(kind="hh", bar_index=12, ts=datetime(2024, 1, 1, 12, tzinfo=UTC), price=100.2, timeframe="H1"),
-        StructureObject(kind="hl", bar_index=15, ts=datetime(2024, 1, 1, 15, tzinfo=UTC), price=96.0, timeframe="H1"),
+        StructureObject(
+            kind="swing_high",
+            bar_index=5,
+            ts=datetime(2024, 1, 1, tzinfo=UTC),
+            price=100.0,
+            timeframe="H1",
+        ),
+        StructureObject(
+            kind="swing_low",
+            bar_index=8,
+            ts=datetime(2024, 1, 1, 8, tzinfo=UTC),
+            price=95.0,
+            timeframe="H1",
+        ),
+        StructureObject(
+            kind="hh",
+            bar_index=12,
+            ts=datetime(2024, 1, 1, 12, tzinfo=UTC),
+            price=100.2,
+            timeframe="H1",
+        ),
+        StructureObject(
+            kind="hl",
+            bar_index=15,
+            ts=datetime(2024, 1, 1, 15, tzinfo=UTC),
+            price=96.0,
+            timeframe="H1",
+        ),
     ]
-    pools = detect_liquidity_pools(candles([pin(100.0)] * 20), struct, tolerance=0.005, min_touches=2)
+    pools = detect_liquidity_pools(
+        candles([pin(100.0)] * 20), struct, tolerance=0.005, min_touches=2
+    )
     eqh = [p for p in pools if p.kind == "eqh"]
     assert len(eqh) == 1
     assert eqh[0].direction == "bearish"
@@ -100,7 +137,15 @@ def test_equal_highs_group_into_eqh_pool() -> None:
 
 
 def test_isolated_swing_does_not_form_pool() -> None:
-    struct = [StructureObject(kind="swing_high", bar_index=5, ts=datetime(2024, 1, 1, tzinfo=UTC), price=100.0, timeframe="H1")]
+    struct = [
+        StructureObject(
+            kind="swing_high",
+            bar_index=5,
+            ts=datetime(2024, 1, 1, tzinfo=UTC),
+            price=100.0,
+            timeframe="H1",
+        )
+    ]
     assert detect_liquidity_pools(candles([pin(100.0)] * 10), struct, min_touches=2) == []
 
 
@@ -109,10 +154,24 @@ def test_isolated_swing_does_not_form_pool() -> None:
 
 def test_eqh_sweep_pierces_and_closes_back_inside() -> None:
     struct = [
-        StructureObject(kind="swing_high", bar_index=5, ts=datetime(2024, 1, 1, tzinfo=UTC), price=100.0, timeframe="H1"),
-        StructureObject(kind="hh", bar_index=12, ts=datetime(2024, 1, 1, 12, tzinfo=UTC), price=100.2, timeframe="H1"),
+        StructureObject(
+            kind="swing_high",
+            bar_index=5,
+            ts=datetime(2024, 1, 1, tzinfo=UTC),
+            price=100.0,
+            timeframe="H1",
+        ),
+        StructureObject(
+            kind="hh",
+            bar_index=12,
+            ts=datetime(2024, 1, 1, 12, tzinfo=UTC),
+            price=100.2,
+            timeframe="H1",
+        ),
     ]
-    pools = detect_liquidity_pools(candles([pin(100.0)] * 20), struct, tolerance=0.005, min_touches=2)
+    pools = detect_liquidity_pools(
+        candles([pin(100.0)] * 20), struct, tolerance=0.005, min_touches=2
+    )
     series = [pin(100.0)] * 13 + [(100.5, 101.5, 99.0, 99.5)]  # h 101.5 > 100.2, close 99.5 < 100.2
     sweeps = detect_sweeps(candles(series), pools)
     assert len(sweeps) == 1
@@ -124,10 +183,24 @@ def test_eqh_sweep_pierces_and_closes_back_inside() -> None:
 
 def test_close_beyond_pool_is_breakout_not_sweep() -> None:
     struct = [
-        StructureObject(kind="swing_high", bar_index=5, ts=datetime(2024, 1, 1, tzinfo=UTC), price=100.0, timeframe="H1"),
-        StructureObject(kind="hh", bar_index=12, ts=datetime(2024, 1, 1, 12, tzinfo=UTC), price=100.2, timeframe="H1"),
+        StructureObject(
+            kind="swing_high",
+            bar_index=5,
+            ts=datetime(2024, 1, 1, tzinfo=UTC),
+            price=100.0,
+            timeframe="H1",
+        ),
+        StructureObject(
+            kind="hh",
+            bar_index=12,
+            ts=datetime(2024, 1, 1, 12, tzinfo=UTC),
+            price=100.2,
+            timeframe="H1",
+        ),
     ]
-    pools = detect_liquidity_pools(candles([pin(100.0)] * 20), struct, tolerance=0.005, min_touches=2)
+    pools = detect_liquidity_pools(
+        candles([pin(100.0)] * 20), struct, tolerance=0.005, min_touches=2
+    )
     series = [pin(100.0)] * 13 + [(100.5, 101.5, 100.3, 101.3)]  # closes above the pool
     assert detect_sweeps(candles(series), pools) == []
 
@@ -191,8 +264,20 @@ def test_breaker_block_forms_after_swept_order_block_reclaimed() -> None:
 
 def test_premium_discount_splits_dealing_range_at_midpoint() -> None:
     struct = [
-        StructureObject(kind="swing_low", bar_index=10, ts=datetime(2024, 1, 1, 10, tzinfo=UTC), price=90.0, timeframe="H1"),
-        StructureObject(kind="swing_high", bar_index=14, ts=datetime(2024, 1, 1, 14, tzinfo=UTC), price=110.0, timeframe="H1"),
+        StructureObject(
+            kind="swing_low",
+            bar_index=10,
+            ts=datetime(2024, 1, 1, 10, tzinfo=UTC),
+            price=90.0,
+            timeframe="H1",
+        ),
+        StructureObject(
+            kind="swing_high",
+            bar_index=14,
+            ts=datetime(2024, 1, 1, 14, tzinfo=UTC),
+            price=110.0,
+            timeframe="H1",
+        ),
     ]
     zones = detect_premium_discount(candles([pin(100.0)] * 20), struct)
     by_kind = {z.kind: z for z in zones}
@@ -218,10 +303,29 @@ def test_analyze_smc_returns_every_detector_and_is_deterministic() -> None:
     assert result["symbol"] == "EURUSD"
     assert result["timeframe"] == "H1"
     assert result["candles"] == 40
-    for key in ("fvg", "displacement", "liquidity_pools", "sweeps", "order_blocks", "breaker_blocks", "premium_discount"):
+    for key in (
+        "fvg",
+        "displacement",
+        "liquidity_pools",
+        "sweeps",
+        "order_blocks",
+        "breaker_blocks",
+        "premium_discount",
+    ):
         assert key in result
         for obj in result[key]:
-            assert {"kind", "bar_index", "ts", "timeframe", "direction", "range_low", "range_high", "strength", "status", "invalidation_price"} <= set(obj)
+            assert {
+                "kind",
+                "bar_index",
+                "ts",
+                "timeframe",
+                "direction",
+                "range_low",
+                "range_high",
+                "strength",
+                "status",
+                "invalidation_price",
+            } <= set(obj)
     assert analyze_smc(candles(series), lookback=10) == result
 
 

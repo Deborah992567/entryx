@@ -2,14 +2,11 @@
 
 from __future__ import annotations
 
-import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
-from app.providers.ai.base import AIModelInfo, AIProvider, AIMessage, AIResponse
+from app.providers.ai.base import AIMessage, AIModelInfo, AIResponse
 from app.providers.ai.ollama import OllamaProvider, _detect_family, _extract_size
-
 
 # ------------------------------------------------------------------ base model
 

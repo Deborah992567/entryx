@@ -26,8 +26,13 @@ def test_empty_run_has_zeroed_metrics() -> None:
 
 def test_win_rate_and_expectancy_from_pnl() -> None:
     trades = [trade(100.0), trade(-50.0), trade(200.0), trade(0.0)]
-    metrics = compute_metrics(trades, curve([100_000, 100_100, 100_050, 100_250, 100_250]),
-                              initial_balance=100_000, timeframe="H1", end_balance=100_250)
+    metrics = compute_metrics(
+        trades,
+        curve([100_000, 100_100, 100_050, 100_250, 100_250]),
+        initial_balance=100_000,
+        timeframe="H1",
+        end_balance=100_250,
+    )
     assert metrics["total_trades"] == 4
     assert metrics["winning_trades"] == 2
     assert metrics["losing_trades"] == 1
@@ -39,23 +44,30 @@ def test_win_rate_and_expectancy_from_pnl() -> None:
 
 def test_profit_factor_is_gross_ratio() -> None:
     trades = [trade(300.0), trade(-100.0), trade(-50.0)]
-    metrics = compute_metrics(trades, curve([100_000]), initial_balance=100_000, timeframe="H1",
-                              end_balance=100_150)
+    metrics = compute_metrics(
+        trades, curve([100_000]), initial_balance=100_000, timeframe="H1", end_balance=100_150
+    )
     assert metrics["gross_profit"] == pytest.approx(300.0)
     assert metrics["gross_loss"] == pytest.approx(150.0)
     assert metrics["profit_factor"] == pytest.approx(2.0)
 
 
 def test_profit_factor_none_without_losing_trades() -> None:
-    metrics = compute_metrics([trade(50.0)], curve([100_000]), initial_balance=100_000,
-                              timeframe="H1", end_balance=100_050)
+    metrics = compute_metrics(
+        [trade(50.0)],
+        curve([100_000]),
+        initial_balance=100_000,
+        timeframe="H1",
+        end_balance=100_050,
+    )
     assert metrics["profit_factor"] is None
 
 
 def test_avg_and_largest_win_loss() -> None:
     trades = [trade(100.0), trade(-40.0), trade(300.0), trade(-10.0)]
-    metrics = compute_metrics(trades, curve([100_000]), initial_balance=100_000, timeframe="H1",
-                              end_balance=100_350)
+    metrics = compute_metrics(
+        trades, curve([100_000]), initial_balance=100_000, timeframe="H1", end_balance=100_350
+    )
     assert metrics["avg_win"] == pytest.approx(200.0)
     assert metrics["avg_loss"] == pytest.approx(25.0)
     assert metrics["largest_win"] == pytest.approx(300.0)

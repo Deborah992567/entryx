@@ -7,9 +7,8 @@ trading, structure, SMC, AI, and safeguards endpoints.
 from __future__ import annotations
 
 import pytest
-from fastapi.testclient import TestClient
-
 from app.main import create_app
+from fastapi.testclient import TestClient
 
 
 @pytest.fixture
@@ -22,15 +21,21 @@ def client():
 @pytest.fixture
 def auth_headers(client):
     """Register a test user and return auth headers."""
-    client.post("/api/v1/auth/register", json={
-        "email": "test_phase10@example.com",
-        "password": "TestPass123!",
-        "name": "Test Phase10",
-    })
-    resp = client.post("/api/v1/auth/login", json={
-        "email": "test_phase10@example.com",
-        "password": "TestPass123!",
-    })
+    client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": "test_phase10@example.com",
+            "password": "TestPass123!",
+            "name": "Test Phase10",
+        },
+    )
+    resp = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "test_phase10@example.com",
+            "password": "TestPass123!",
+        },
+    )
     data = resp.json()
     token = data.get("access_token", "")
     return {"Authorization": f"Bearer {token}"}
@@ -44,7 +49,9 @@ class TestHealthEndpoint:
 
 class TestMarketEndpoints:
     def test_candles(self, client, auth_headers):
-        resp = client.get("/api/v1/market/candles?symbol=XAUUSD&tf=H1&limit=50", headers=auth_headers)
+        resp = client.get(
+            "/api/v1/market/candles?symbol=XAUUSD&tf=H1&limit=50", headers=auth_headers
+        )
         assert resp.status_code == 200
         data = resp.json()
         assert isinstance(data, list)
@@ -102,22 +109,22 @@ class TestSafeguardsEndpoint:
         assert resp.status_code == 200
 
     def test_kill_switch_toggle(self, client, auth_headers):
-        resp = client.post("/api/v1/safeguards/kill-switch",
-                          json={"active": True}, headers=auth_headers)
+        resp = client.post(
+            "/api/v1/safeguards/kill-switch", json={"active": True}, headers=auth_headers
+        )
         assert resp.status_code == 200
         assert resp.json()["kill_switch"] is True
         # reset
-        client.post("/api/v1/safeguards/kill-switch",
-                    json={"active": False}, headers=auth_headers)
+        client.post("/api/v1/safeguards/kill-switch", json={"active": False}, headers=auth_headers)
 
     def test_update_safeguards(self, client, auth_headers):
-        resp = client.put("/api/v1/safeguards",
-                         json={"max_position_size": 5.0}, headers=auth_headers)
+        resp = client.put(
+            "/api/v1/safeguards", json={"max_position_size": 5.0}, headers=auth_headers
+        )
         assert resp.status_code == 200
         assert resp.json()["max_position_size"] == 5.0
         # reset
-        client.put("/api/v1/safeguards",
-                   json={"max_position_size": 10.0}, headers=auth_headers)
+        client.put("/api/v1/safeguards", json={"max_position_size": 10.0}, headers=auth_headers)
 
 
 class TestTradingEndpoint:

@@ -34,7 +34,9 @@ def register(db: Session, *, email: str, password: str, name: str, ip: str = "")
     db.add(user)
     db.commit()
     db.refresh(user)
-    audit.record(db, action="auth.register", user_id=user.id, entity="users", entity_id=user.id, ip=ip)
+    audit.record(
+        db, action="auth.register", user_id=user.id, entity="users", entity_id=user.id, ip=ip
+    )
     return user
 
 
@@ -74,7 +76,9 @@ def refresh(db: Session, *, raw_refresh: str, ip: str = "") -> dict:
     settings = get_settings()
     token_hash = security.sha256_hex(raw_refresh)
     token = db.scalar(
-        select(RefreshToken).where(RefreshToken.token_hash == token_hash, RefreshToken.revoked_at.is_(None))
+        select(RefreshToken).where(
+            RefreshToken.token_hash == token_hash, RefreshToken.revoked_at.is_(None)
+        )
     )
     if not token:
         raise UnauthorizedError("invalid or expired refresh token")
@@ -87,7 +91,9 @@ def refresh(db: Session, *, raw_refresh: str, ip: str = "") -> dict:
 
     token.revoked_at = now  # rotate: one-time use
     db.commit()
-    audit.record(db, action="auth.refresh", user_id=user.id, entity="users", entity_id=user.id, ip=ip)
+    audit.record(
+        db, action="auth.refresh", user_id=user.id, entity="users", entity_id=user.id, ip=ip
+    )
 
     access = security.create_access_token(str(user.id), settings)
     raw_new, token_hash_new, expires_at = security.create_refresh_token(settings)
@@ -114,7 +120,9 @@ def logout(db: Session, *, raw_refresh: str, user_id: int, ip: str = "") -> None
     if token and token.user_id == user_id:
         token.revoked_at = datetime.now(UTC)
         db.commit()
-    audit.record(db, action="auth.logout", user_id=user_id, entity="users", entity_id=user_id, ip=ip)
+    audit.record(
+        db, action="auth.logout", user_id=user_id, entity="users", entity_id=user_id, ip=ip
+    )
 
 
 def current_user_from_token(db: Session, access_token: str) -> User:

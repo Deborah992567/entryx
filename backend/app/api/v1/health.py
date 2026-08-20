@@ -56,9 +56,7 @@ def health() -> HealthOut:
 
 
 @router.get("/system/status", response_model=dict)
-def system_status(
-    _db: Session = Depends(get_db), _user: User = Depends(get_current_user)
-) -> dict:
+def system_status(_db: Session = Depends(get_db), _user: User = Depends(get_current_user)) -> dict:
     return {
         "app": APP_VERSION,
         "components": {
@@ -69,5 +67,3 @@ def system_status(
         },
         "ws": manager.stats(),
     }
-
-

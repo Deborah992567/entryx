@@ -14,7 +14,6 @@ from app.db.models.ai import AIAnalysis
 from app.providers.ai import get_ai_provider
 from app.providers.ai.base import AIMessage as ProviderMsg
 
-
 BUILDER_SYSTEM = """You are a trading strategy builder. Convert natural language
 trading ideas into structured JSON strategy rules.
 

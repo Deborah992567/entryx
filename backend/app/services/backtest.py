@@ -64,7 +64,9 @@ def config_to_dict(config: BacktestConfig) -> dict:
     out: dict = {}
     for field in dataclasses.fields(BacktestConfig):
         value = getattr(config, field.name)
-        out[field.name] = value.isoformat() if isinstance(value, datetime) and value is not None else value
+        out[field.name] = (
+            value.isoformat() if isinstance(value, datetime) and value is not None else value
+        )
     return out
 
 
@@ -104,7 +106,9 @@ class BacktestBroker:
     def symbol_info(self, symbol: str):
         return market_data.symbol_info(symbol)
 
-    def candles(self, symbol: str, timeframe: str, count: int, end_ts: datetime | None = None) -> list[Candle]:
+    def candles(
+        self, symbol: str, timeframe: str, count: int, end_ts: datetime | None = None
+    ) -> list[Candle]:
         return self._series
 
     def quote(self, symbol: str, at: datetime | None = None) -> Quote:
@@ -328,7 +332,11 @@ class BacktestBroker:
             sl_hit = sl is not None and low <= sl
             tp_hit = tp is not None and high >= tp
             if sl_hit and tp_hit:
-                return min(sl, open_price) if open_price - sl <= tp - open_price else max(tp, open_price)
+                return (
+                    min(sl, open_price)
+                    if open_price - sl <= tp - open_price
+                    else max(tp, open_price)
+                )
             if sl_hit:
                 return self._apply_slippage("sell", min(sl, open_price))
             if tp_hit:
@@ -337,7 +345,11 @@ class BacktestBroker:
             sl_hit = sl is not None and high >= sl
             tp_hit = tp is not None and low <= tp
             if sl_hit and tp_hit:
-                return max(sl, open_price) if sl - open_price <= open_price - tp else min(tp, open_price)
+                return (
+                    max(sl, open_price)
+                    if sl - open_price <= open_price - tp
+                    else min(tp, open_price)
+                )
             if sl_hit:
                 return self._apply_slippage("buy", max(sl, open_price))
             if tp_hit:
@@ -368,7 +380,14 @@ class BacktestBroker:
 
     # -- positions / queries --------------------------------------------------
 
-    def close_position(self, position_id: str, price: float | None = None, volume: float | None = None, *, at: datetime | None = None) -> ClosedTrade:
+    def close_position(
+        self,
+        position_id: str,
+        price: float | None = None,
+        volume: float | None = None,
+        *,
+        at: datetime | None = None,
+    ) -> ClosedTrade:
         position = self._positions.get(position_id)
         if position is None:
             raise UnknownRefError(f"unknown position: {position_id}")
@@ -408,7 +427,9 @@ class BacktestBroker:
         if volume >= position.volume:
             del self._positions[position_id]
         else:
-            self._positions[position_id] = _replace_position(position, volume=round(position.volume - volume, 4))
+            self._positions[position_id] = _replace_position(
+                position, volume=round(position.volume - volume, 4)
+            )
         self._closed.append(trade)
         self._trade_open[trade.id] = position.opened_at
         return trade
@@ -466,7 +487,9 @@ class BacktestBroker:
             extreme = bid if position.side == "buy" else ask
         else:
             extreme = position.trail_extreme
-        updated = _replace_position(position, sl=new_sl, tp=new_tp, trail=new_trail, trail_extreme=extreme)
+        updated = _replace_position(
+            position, sl=new_sl, tp=new_tp, trail=new_trail, trail_extreme=extreme
+        )
         self._positions[position_id] = updated
         return updated
 
@@ -490,7 +513,9 @@ class BacktestBroker:
         bid, ask = self._bid_ask(candle.c)
         price = bid if position.side == "buy" else ask
         direction = 1.0 if position.side == "buy" else -1.0
-        return (price - position.open_price) * direction * self._info.contract_size * position.volume
+        return (
+            (price - position.open_price) * direction * self._info.contract_size * position.volume
+        )
 
     def floating_pnl_total(self) -> float:
         return round(sum(self.floating_pnl(p) for p in self._positions.values()), 2)
@@ -538,7 +563,9 @@ class BacktestBroker:
 # ---------------------------------------------------------------------------
 
 
-def trade_to_dict(trade: ClosedTrade, broker: BacktestBroker, bar_indexes: dict[str, int] | None = None) -> dict:
+def trade_to_dict(
+    trade: ClosedTrade, broker: BacktestBroker, bar_indexes: dict[str, int] | None = None
+) -> dict:
     """Serialize a closed trade, including candle bar indices for chart plotting.
 
     ``bar_indexes`` maps candle timestamps (ISO strings) to their position in

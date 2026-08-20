@@ -15,9 +15,7 @@ from app.db.models.workspace import Drawing
 from app.schemas.workspace import DrawingIn
 
 
-def list_drawings(
-    db: Session, *, user_id: int, symbol: str, timeframe: str
-) -> list[Drawing]:
+def list_drawings(db: Session, *, user_id: int, symbol: str, timeframe: str) -> list[Drawing]:
     stmt = (
         select(Drawing)
         .where(

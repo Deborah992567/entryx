@@ -74,7 +74,10 @@ def test_refresh_rotates_tokens(client, registered_user, user_payload):
 def test_refresh_token_is_single_use(client, registered_user, user_payload):
     login = client.post("/api/v1/auth/login", json=user_payload).json()
     refresh_token = login["refresh_token"]
-    assert client.post("/api/v1/auth/refresh", json={"refresh_token": refresh_token}).status_code == 200
+    assert (
+        client.post("/api/v1/auth/refresh", json={"refresh_token": refresh_token}).status_code
+        == 200
+    )
     resp = client.post("/api/v1/auth/refresh", json={"refresh_token": refresh_token})
     assert resp.status_code == 401
 
@@ -87,7 +90,9 @@ def test_refresh_rejects_garbage(client, registered_user):
 def test_logout_revokes_refresh(client, registered_user, user_payload):
     login = client.post("/api/v1/auth/login", json=user_payload).json()
     headers = {"Authorization": f"Bearer {login['access_token']}"}
-    resp = client.post("/api/v1/auth/logout", json={"refresh_token": login["refresh_token"]}, headers=headers)
+    resp = client.post(
+        "/api/v1/auth/logout", json={"refresh_token": login["refresh_token"]}, headers=headers
+    )
     assert resp.status_code == 204
     refresh = client.post("/api/v1/auth/refresh", json={"refresh_token": login["refresh_token"]})
     assert refresh.status_code == 401

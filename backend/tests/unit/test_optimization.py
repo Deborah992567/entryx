@@ -36,7 +36,9 @@ def test_expand_param_grid_requires_one_range() -> None:
 
 def test_expand_param_grid_rejects_oversized_grid() -> None:
     with pytest.raises(ValueError):
-        expand_param_grid({"fast": {"values": list(range(100))}, "slow": {"values": list(range(100))}})
+        expand_param_grid(
+            {"fast": {"values": list(range(100))}, "slow": {"values": list(range(100))}}
+        )
 
 
 def test_optimize_strategy_returns_ranked_results() -> None:
@@ -96,7 +98,10 @@ def test_optimize_captures_invalid_combos() -> None:
 
 
 def test_overfit_assessment_low_score_when_consistent() -> None:
-    best = {"params": {}, "metrics": {"total_trades": 50, "profit_factor": 1.8, "max_drawdown_pct": 5.0}}
+    best = {
+        "params": {},
+        "metrics": {"total_trades": 50, "profit_factor": 1.8, "max_drawdown_pct": 5.0},
+    }
     score, warnings = compute_overfit_assessment(
         higher_is_better=True,
         best=best,
@@ -110,7 +115,10 @@ def test_overfit_assessment_low_score_when_consistent() -> None:
 
 
 def test_overfit_assessment_high_score_when_fragile() -> None:
-    best = {"params": {}, "metrics": {"total_trades": 8, "profit_factor": 0.9, "max_drawdown_pct": 60.0}}
+    best = {
+        "params": {},
+        "metrics": {"total_trades": 8, "profit_factor": 0.9, "max_drawdown_pct": 60.0},
+    }
     score, warnings = compute_overfit_assessment(
         higher_is_better=True,
         best=best,

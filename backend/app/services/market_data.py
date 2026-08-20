@@ -81,7 +81,9 @@ class MarketDataProvider(ABC):
     def symbol_info(self, symbol: str) -> SymbolInfo: ...
 
     @abstractmethod
-    def candles(self, symbol: str, timeframe: str, count: int, end_ts: datetime | None = None) -> list[Candle]: ...
+    def candles(
+        self, symbol: str, timeframe: str, count: int, end_ts: datetime | None = None
+    ) -> list[Candle]: ...
 
     @abstractmethod
     def quote(self, symbol: str, at: datetime | None = None) -> Quote: ...
@@ -97,13 +99,41 @@ class SimulatedMarketDataProvider(MarketDataProvider):
 
     DEFAULT_SYMBOLS: tuple[SymbolInfo, ...] = (
         SymbolInfo("EURUSD", "Euro / US Dollar", "forex", "EUR", "USD", 5, 0.00001, 100_000, 10.0),
-        SymbolInfo("GBPUSD", "British Pound / US Dollar", "forex", "GBP", "USD", 5, 0.00001, 100_000, 10.0),
-        SymbolInfo("USDJPY", "US Dollar / Japanese Yen", "forex", "USD", "JPY", 3, 0.001, 100_000, 1000.0),
-        SymbolInfo("AUDUSD", "Australian Dollar / US Dollar", "forex", "AUD", "USD", 5, 0.00001, 100_000, 10.0),
-        SymbolInfo("USDCAD", "US Dollar / Canadian Dollar", "forex", "USD", "CAD", 5, 0.00001, 100_000, 10.0),
-        SymbolInfo("USDCHF", "US Dollar / Swiss Franc", "forex", "USD", "CHF", 5, 0.00001, 100_000, 10.0),
+        SymbolInfo(
+            "GBPUSD", "British Pound / US Dollar", "forex", "GBP", "USD", 5, 0.00001, 100_000, 10.0
+        ),
+        SymbolInfo(
+            "USDJPY", "US Dollar / Japanese Yen", "forex", "USD", "JPY", 3, 0.001, 100_000, 1000.0
+        ),
+        SymbolInfo(
+            "AUDUSD",
+            "Australian Dollar / US Dollar",
+            "forex",
+            "AUD",
+            "USD",
+            5,
+            0.00001,
+            100_000,
+            10.0,
+        ),
+        SymbolInfo(
+            "USDCAD",
+            "US Dollar / Canadian Dollar",
+            "forex",
+            "USD",
+            "CAD",
+            5,
+            0.00001,
+            100_000,
+            10.0,
+        ),
+        SymbolInfo(
+            "USDCHF", "US Dollar / Swiss Franc", "forex", "USD", "CHF", 5, 0.00001, 100_000, 10.0
+        ),
         SymbolInfo("XAUUSD", "Gold Spot / US Dollar", "commodity", "XAU", "USD", 2, 0.01, 100, 1.0),
-        SymbolInfo("XAGUSD", "Silver Spot / US Dollar", "commodity", "XAG", "USD", 3, 0.001, 5000, 5.0),
+        SymbolInfo(
+            "XAGUSD", "Silver Spot / US Dollar", "commodity", "XAG", "USD", 3, 0.001, 5000, 5.0
+        ),
         SymbolInfo("BTCUSD", "Bitcoin / US Dollar", "crypto", "BTC", "USD", 2, 0.01, 1, 1.0),
         SymbolInfo("ETHUSD", "Ethereum / US Dollar", "crypto", "ETH", "USD", 2, 0.01, 1, 1.0),
         SymbolInfo("US500", "S&P 500 Index", "index", "USD", "USD", 2, 0.1, 50, 5.0),
@@ -142,7 +172,9 @@ class SimulatedMarketDataProvider(MarketDataProvider):
         except KeyError as exc:
             raise KeyError(f"unknown symbol: {symbol}") from exc
 
-    def candles(self, symbol: str, timeframe: str, count: int, end_ts: datetime | None = None) -> list[Candle]:
+    def candles(
+        self, symbol: str, timeframe: str, count: int, end_ts: datetime | None = None
+    ) -> list[Candle]:
         info = self.symbol_info(symbol)
         tf = timeframe.upper()
         minutes = timeframe_minutes(tf)

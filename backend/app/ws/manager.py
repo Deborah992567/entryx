@@ -36,11 +36,7 @@ class ConnectionManager:
 
     def disconnect(self, connection_id: str) -> list[str]:
         self._connections.pop(connection_id, None)
-        stale = [
-            channel
-            for channel, subs in self._channels.items()
-            if connection_id in subs
-        ]
+        stale = [channel for channel, subs in self._channels.items() if connection_id in subs]
         for channel in stale:
             self._channels[channel].discard(connection_id)
         return stale
@@ -65,7 +61,11 @@ class ConnectionManager:
             subs.discard(connection_id)
 
     def channel_subscribers(self, channel: str) -> list[WebSocket]:
-        return [self._connections[cid] for cid in self._channels.get(channel, set()) if cid in self._connections]
+        return [
+            self._connections[cid]
+            for cid in self._channels.get(channel, set())
+            if cid in self._connections
+        ]
 
     def active_channels(self) -> list[str]:
         """Channels that currently have at least one subscriber."""
@@ -113,7 +113,11 @@ def is_channel_authorized(connection_user_id: int, channel: str) -> bool:
     if channel.startswith("account."):
         owner = channel.removeprefix("account.")
         return owner.isdigit() and int(owner) == connection_user_id
-    if channel.startswith("orders") or channel.startswith("positions") or channel.startswith("history"):
+    if (
+        channel.startswith("orders")
+        or channel.startswith("positions")
+        or channel.startswith("history")
+    ):
         return True
     return True  # alerts / ai.scanner are user-scoped but not id-embedded (Phase 1: allow)
 

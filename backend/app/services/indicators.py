@@ -123,7 +123,9 @@ def _rsi_value(avg_gain: float, avg_loss: float) -> float:
     return round(100.0 - 100.0 / (1.0 + rs), 4)
 
 
-def macd(candles: list[Candle], fast: int = 12, slow: int = 26, signal: int = 9) -> dict[str, Series]:
+def macd(
+    candles: list[Candle], fast: int = 12, slow: int = 26, signal: int = 9
+) -> dict[str, Series]:
     """MACD histogram: macd, signal, histogram."""
     if fast >= slow:
         raise ValueError("fast period must be smaller than slow period")
@@ -401,7 +403,11 @@ def psar(candles: list[Candle], step: float = 0.02, max_step: float = 0.2) -> Se
         candle = candles[i]
         if uptrend:
             sar = sar + accel * (ep - sar)
-            sar = min(sar, candles[i - 1].low, candles[i - 2].low) if i >= 2 else min(sar, candles[i - 1].low)
+            sar = (
+                min(sar, candles[i - 1].low, candles[i - 2].low)
+                if i >= 2
+                else min(sar, candles[i - 1].low)
+            )
             if candle.low < sar:
                 uptrend = False
                 sar = ep
@@ -412,7 +418,11 @@ def psar(candles: list[Candle], step: float = 0.02, max_step: float = 0.2) -> Se
                 accel = min(accel + step, max_step)
         else:
             sar = sar + accel * (ep - sar)
-            sar = max(sar, candles[i - 1].h, candles[i - 2].h) if i >= 2 else max(sar, candles[i - 1].h)
+            sar = (
+                max(sar, candles[i - 1].h, candles[i - 2].h)
+                if i >= 2
+                else max(sar, candles[i - 1].h)
+            )
             if candle.h > sar:
                 uptrend = True
                 sar = ep

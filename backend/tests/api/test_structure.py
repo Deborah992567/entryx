@@ -22,11 +22,15 @@ def test_structure_returns_all_detectors(client: TestClient, auth_headers: dict)
     for key in ("bos", "choch", "regimes", "breakouts", "retests"):
         assert key in body
         for obj in body[key]:
-            assert {"kind", "bar_index", "ts", "price", "timeframe", "direction", "status"} <= set(obj)
+            assert {"kind", "bar_index", "ts", "price", "timeframe", "direction", "status"} <= set(
+                obj
+            )
 
 
 def test_structure_honours_swing_params(client: TestClient, auth_headers: dict) -> None:
-    resp = client.get("/api/v1/structure?symbol=EURUSD&tf=H1&limit=100&left=3&right=1", headers=auth_headers)
+    resp = client.get(
+        "/api/v1/structure?symbol=EURUSD&tf=H1&limit=100&left=3&right=1", headers=auth_headers
+    )
     assert resp.status_code == 200
     body = resp.json()
     assert body["left"] == 3 and body["right"] == 1
