@@ -67,10 +67,10 @@ Legend: `[x]` done · `[~]` in progress · `[ ]` planned
 
 ## PHASE 7 — Local AI infrastructure
 
-- [ ] `AIProvider` abstraction: `generate/stream/analyze/embed/health_check`
-- [ ] `OllamaProvider`, model registry + selection (Llama/Qwen/Mistral families), health UI
-- [ ] AI feature pipeline: market data → features → analysis → explanation
-- [ ] AI Copilot panel (chat grounded in real EntryX data, never invented)
+- [x] `AIProvider` abstraction: `generate/stream/analyze/embed/health_check`
+- [x] `OllamaProvider`, model registry + selection (Llama/Qwen/Mistral families), health UI
+- [x] AI feature pipeline: market data → features → analysis → explanation
+- [x] AI Copilot panel (chat grounded in real EntryX data, never invented)
 
 ## PHASE 8 — AI applications
 
@@ -110,7 +110,7 @@ Legend: `[x]` done · `[~]` in progress · `[ ]` planned
 | 4 | Trading engine + risk | done |
 | 5 | Strategy + backtesting + optimization | done |
 | 6 | Market structure + SMC | done |
-| 7 | Local AI infrastructure | planned |
+| 7 | Local AI infrastructure | done |
 | 8 | AI applications | planned |
 | 9 | Broker adapters + live safeguards | planned |
 | 10 | Hardening + packaging | planned |
