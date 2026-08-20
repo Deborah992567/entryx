@@ -1,11 +1,12 @@
 """Security middleware for EntryX API.
 
-Adds request validation, rate limiting, and security headers.
+Adds request validation, rate limiting, security headers, and request tracing.
 """
 
 from __future__ import annotations
 
 import time
+import uuid as _uuid
 from collections import defaultdict
 
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -53,8 +54,13 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                 content={"detail": "Rate limit exceeded. Try again later."},
             )
 
+        remaining = max(0, self.max_requests - len(self._requests[client_ip]))
         self._requests[client_ip].append(now)
-        return await call_next(request)
+        response = await call_next(request)
+        response.headers["X-RateLimit-Limit"] = str(self.max_requests)
+        response.headers["X-RateLimit-Remaining"] = str(remaining)
+        response.headers["X-RateLimit-Reset"] = str(int(now + self.window_seconds))
+        return response
 
 
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
@@ -75,4 +81,15 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             response.status_code,
             elapsed_ms,
         )
+        return response
+
+
+class RequestIDMiddleware(BaseHTTPMiddleware):
+    """Attach a unique request ID to every request for distributed tracing."""
+
+    async def dispatch(self, request: Request, call_next):
+        request_id = request.headers.get("X-Request-ID") or _uuid.uuid4().hex[:12]
+        request.state.request_id = request_id
+        response = await call_next(request)
+        response.headers["X-Request-ID"] = request_id
         return response
