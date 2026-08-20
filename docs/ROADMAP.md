@@ -88,7 +88,7 @@ Legend: `[x]` done · `[~]` in progress · `[ ]` planned
 
 ## PHASE 10 — Hardening
 
-- [ ] Full unit/integration/API/WS/db/security test matrix
+- [x] Full unit/integration/API/WS/db/security test matrix
 - [ ] Performance: chart rendering, backtest speed, WS fan-out
 - [ ] Packaging (Tauri desktop bundle, installer), deployment docs
 
