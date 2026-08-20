@@ -15,12 +15,15 @@ from app.db.session import get_db
 from app.schemas.ai import (
     AnalysisRequest,
     AnalysisResponse,
+    ChartExplainRequest,
     ChatRequest,
     ChatResponse,
     ConversationOut,
     HealthOut,
     MessageOut,
     ModelInfoOut,
+    RiskRequest,
+    ScanRequest,
 )
 from app.services.ai_service import AIService
 
@@ -112,6 +115,57 @@ async def analyze(
         symbol=body.symbol,
         timeframe=body.timeframe,
         kind=body.kind,
+    )
+
+
+# ----------------------------------------------------------- Phase 8: AI apps
+
+
+@router.post("/explain-chart", response_model=AnalysisResponse)
+async def explain_chart(
+    body: ChartExplainRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> AnalysisResponse:
+    svc = AIService(db)
+    content = await svc.explain_chart(body.symbol, body.timeframe, user_id=user.id)
+    return AnalysisResponse(
+        content=content, model="", symbol=body.symbol,
+        timeframe=body.timeframe, kind="chart_explainer",
+    )
+
+
+@router.post("/scan", response_model=AnalysisResponse)
+async def scan_market(
+    body: ScanRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> AnalysisResponse:
+    svc = AIService(db)
+    content = await svc.scan_market(body.symbols, body.timeframes, user_id=user.id)
+    return AnalysisResponse(
+        content=content, model="",
+        symbol=",".join(body.symbols),
+        timeframe=",".join(body.timeframes),
+        kind="scanner",
+    )
+
+
+@router.post("/risk", response_model=AnalysisResponse)
+async def risk_copilot(
+    body: RiskRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> AnalysisResponse:
+    svc = AIService(db)
+    content = await svc.explain_risk(
+        symbol=body.symbol, timeframe=body.timeframe,
+        entry_price=body.entry_price, direction=body.direction,
+        user_id=user.id,
+    )
+    return AnalysisResponse(
+        content=content, model="", symbol=body.symbol,
+        timeframe=body.timeframe, kind="risk_copilot",
     )
 
 

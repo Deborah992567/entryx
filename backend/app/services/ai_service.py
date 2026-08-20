@@ -224,3 +224,137 @@ class AIService:
         self._db.commit()
 
         return response.content
+
+    # -------------------------------------------------------- chart explainer
+
+    async def explain_chart(
+        self,
+        symbol: str,
+        timeframe: str = "H1",
+        user_id: int = 0,
+    ) -> str:
+        """Explain the current chart state with structured output."""
+        context = self.build_market_context(symbol, timeframe, limit=300)
+        messages = [
+            ProviderMsg(role="system", content=SYSTEM_PROMPT),
+            ProviderMsg(role="system", content=f"Chart data:\n{context}"),
+            ProviderMsg(
+                role="user",
+                content=(
+                    f"Explain this {symbol} {timeframe} chart. Cover:\n"
+                    "1. Current trend and regime\n"
+                    "2. Key support/resistance levels\n"
+                    "3. Recent structural breaks (BOS/CHoCH)\n"
+                    "4. Smart Money signals (FVGs, order blocks, liquidity)\n"
+                    "5. Risk factors and uncertainty\n"
+                    "Be honest about what you cannot determine from the data."
+                ),
+            ),
+        ]
+        response = await self.provider.generate(messages, max_tokens=1024)
+        analysis = AIAnalysis(
+            user_id=user_id,
+            symbol=symbol,
+            timeframe=timeframe,
+            kind="chart_explainer",
+            input_json=json.dumps({"symbol": symbol, "timeframe": timeframe}),
+            output_json=json.dumps({"content": response.content}),
+            model=response.model,
+        )
+        self._db.add(analysis)
+        self._db.commit()
+        return response.content
+
+    # -------------------------------------------------------- market scanner
+
+    async def scan_market(
+        self,
+        symbols: list[str],
+        timeframes: list[str] | None = None,
+        user_id: int = 0,
+    ) -> str:
+        """Scan multiple symbols/timeframes for setups."""
+        tfs = timeframes or ["H1", "H4"]
+        parts = []
+        for sym in symbols:
+            for tf in tfs:
+                ctx = self.build_market_context(sym, tf, limit=100)
+                parts.append(ctx)
+        combined = "\n\n---\n\n".join(parts)
+        messages = [
+            ProviderMsg(role="system", content=SYSTEM_PROMPT),
+            ProviderMsg(role="system", content=f"Market data across symbols:\n{combined}"),
+            ProviderMsg(
+                role="user",
+                content=(
+                    f"Scan {', '.join(symbols)} across {', '.join(tfs)} timeframes. "
+                    "Identify:\n"
+                    "1. Strongest trending pairs\n"
+                    "2. Key reversal zones\n"
+                    "3. Liquidity sweeps in progress\n"
+                    "4. Best risk/reward setups\n"
+                    "Rate each setup: high / medium / low confidence."
+                ),
+            ),
+        ]
+        response = await self.provider.generate(messages, max_tokens=2048)
+        analysis = AIAnalysis(
+            user_id=user_id,
+            symbol=",".join(symbols),
+            timeframe=",".join(tfs),
+            kind="scanner",
+            input_json=json.dumps({"symbols": symbols, "timeframes": tfs}),
+            output_json=json.dumps({"content": response.content}),
+            model=response.model,
+        )
+        self._db.add(analysis)
+        self._db.commit()
+        return response.content
+
+    # -------------------------------------------------------- risk copilot
+
+    async def explain_risk(
+        self,
+        symbol: str,
+        timeframe: str = "H1",
+        entry_price: float | None = None,
+        direction: str = "buy",
+        user_id: int = 0,
+    ) -> str:
+        """Pre-trade risk explanation."""
+        context = self.build_market_context(symbol, timeframe, limit=200)
+        prompt_parts = [
+            f"Analyze risk for a {'LONG' if direction == 'buy' else 'SHORT'} position on {symbol} {timeframe}."
+        ]
+        if entry_price is not None:
+            prompt_parts.append(f"Entry price: {entry_price}")
+        prompt_parts.extend([
+            "Identify:\n"
+            "1. Key stop-loss levels based on structure\n"
+            "2. Nearest take-profit targets\n"
+            "3. Risk/reward ratio estimation\n"
+            "4. Volatility and drawdown risk\n"
+            "5. Structural invalidation levels\n"
+            "Include a mandatory risk warning.",
+        ])
+        messages = [
+            ProviderMsg(role="system", content=SYSTEM_PROMPT),
+            ProviderMsg(role="system", content=f"Market data:\n{context}"),
+            ProviderMsg(role="user", content="\n".join(prompt_parts)),
+        ]
+        response = await self.provider.generate(messages, max_tokens=1024)
+        analysis = AIAnalysis(
+            user_id=user_id,
+            symbol=symbol,
+            timeframe=timeframe,
+            kind="risk_copilot",
+            input_json=json.dumps({
+                "symbol": symbol, "timeframe": timeframe,
+                "entry_price": entry_price, "direction": direction,
+            }),
+            output_json=json.dumps({"content": response.content}),
+            model=response.model,
+        )
+        self._db.add(analysis)
+        self._db.commit()
+        return response.content

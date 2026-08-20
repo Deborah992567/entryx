@@ -59,3 +59,23 @@ class HealthOut(BaseModel):
     models_loaded: int = 0
     default_model: str = ""
     error: str = ""
+
+
+# ----------------------------------------------------------- Phase 8 schemas
+
+
+class ChartExplainRequest(BaseModel):
+    symbol: str = "XAUUSD"
+    timeframe: str = "H1"
+
+
+class ScanRequest(BaseModel):
+    symbols: list[str] = Field(default_factory=lambda: ["XAUUSD", "EURUSD"])
+    timeframes: list[str] = Field(default_factory=lambda: ["H1", "H4"])
+
+
+class RiskRequest(BaseModel):
+    symbol: str = "XAUUSD"
+    timeframe: str = "H1"
+    entry_price: float | None = None
+    direction: str = Field(default="buy", pattern=r"^(buy|sell)$")
