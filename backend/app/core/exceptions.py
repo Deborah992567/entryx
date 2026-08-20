@@ -10,7 +10,7 @@ from typing import Any
 
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import ORJSONResponse
+from fastapi.responses import JSONResponse
 
 
 class EntryXError(Exception):
@@ -44,7 +44,7 @@ class ForbiddenError(EntryXError):
 
 class ValidationError(EntryXError):
     code = "ERR_VALIDATION"
-    http_status = status.HTTP_422_UNPROCESSABLE_ENTITY
+    http_status = status.HTTP_422_UNPROCESSABLE_CONTENT
 
 
 class RateLimitError(EntryXError):
@@ -54,20 +54,20 @@ class RateLimitError(EntryXError):
 
 def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(EntryXError)
-    async def _entryx_error(_: Request, exc: EntryXError) -> ORJSONResponse:
-        return ORJSONResponse(
+    async def _entryx_error(_: Request, exc: EntryXError) -> JSONResponse:
+        return JSONResponse(
             status_code=exc.http_status,
             content={"detail": {"code": exc.code, "message": exc.message, "fields": exc.fields}},
         )
 
     @app.exception_handler(RequestValidationError)
-    async def _validation_error(_: Request, exc: RequestValidationError) -> ORJSONResponse:
+    async def _validation_error(_: Request, exc: RequestValidationError) -> JSONResponse:
         fields: dict[str, Any] = {}
         for err in exc.errors():
             loc = ".".join(str(p) for p in err.get("loc", []) if p != "body")
             fields[loc] = err.get("msg")
-        return ORJSONResponse(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        return JSONResponse(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             content={
                 "detail": {
                     "code": "ERR_VALIDATION",

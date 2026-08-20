@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./entryx.db"
 
     # Security
-    secret_key: str = "dev-only-change-me"
+    secret_key: str = "dev-only-change-me-please-use-64-char-key-in-prod"
     access_token_expire_minutes: int = 15
     refresh_token_expire_days: int = 30
     encryption_key: str = ""
