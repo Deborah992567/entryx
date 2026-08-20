@@ -82,8 +82,8 @@ Legend: `[x]` done · `[~]` in progress · `[ ]` planned
 
 ## PHASE 9 — Broker adapters + live safeguards
 
-- [ ] Additional broker adapters behind `BrokerAdapter`
-- [ ] Live-trading safeguards: opt-in, validation, risk limits, paper validation,
+- [x] Additional broker adapters behind `BrokerAdapter`
+- [x] Live-trading safeguards: opt-in, validation, risk limits, paper validation,
   LIVE confirmation, kill switch, full decision/execution logging
 
 ## PHASE 10 — Hardening
@@ -112,5 +112,5 @@ Legend: `[x]` done · `[~]` in progress · `[ ]` planned
 | 6 | Market structure + SMC | done |
 | 7 | Local AI infrastructure | done |
 | 8 | AI applications | done |
-| 9 | Broker adapters + live safeguards | planned |
+| 9 | Broker adapters + live safeguards | done |
 | 10 | Hardening + packaging | planned |
