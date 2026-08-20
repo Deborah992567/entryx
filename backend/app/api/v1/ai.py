@@ -20,6 +20,7 @@ from app.schemas.ai import (
     ChatResponse,
     ConversationOut,
     HealthOut,
+    JournalRequest,
     MessageOut,
     ModelInfoOut,
     RiskRequest,
@@ -166,6 +167,20 @@ async def risk_copilot(
     return AnalysisResponse(
         content=content, model="", symbol=body.symbol,
         timeframe=body.timeframe, kind="risk_copilot",
+    )
+
+
+@router.post("/journal", response_model=AnalysisResponse)
+async def analyze_journal(
+    body: JournalRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> AnalysisResponse:
+    svc = AIService(db)
+    content = await svc.analyze_journal(user.id, body.trades_json)
+    return AnalysisResponse(
+        content=content, model="", symbol="JOURNAL",
+        timeframe="ALL", kind="journal",
     )
 
 

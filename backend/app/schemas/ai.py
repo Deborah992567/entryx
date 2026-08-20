@@ -79,3 +79,7 @@ class RiskRequest(BaseModel):
     timeframe: str = "H1"
     entry_price: float | None = None
     direction: str = Field(default="buy", pattern=r"^(buy|sell)$")
+
+
+class JournalRequest(BaseModel):
+    trades_json: str = "[]"

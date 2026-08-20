@@ -222,7 +222,49 @@ class AIService:
         )
         self._db.add(analysis)
         self._db.commit()
+        return response.content
 
+    # ---------------------------------------------------- journal analysis
+
+    async def analyze_journal(
+        self,
+        user_id: int,
+        trades_json: str = "[]",
+    ) -> str:
+        """Analyze trading journal for patterns, overtrading, and performance."""
+        messages = [
+            ProviderMsg(role="system", content=SYSTEM_PROMPT),
+            ProviderMsg(
+                role="system",
+                content=f"Trade history:\n{trades_json}",
+            ),
+            ProviderMsg(
+                role="user",
+                content=(
+                    "Analyze this trading journal. Identify:\n"
+                    "1. Win rate and profit factor\n"
+                    "2. Best and worst performing symbols\n"
+                    "3. Time-of-day performance patterns\n"
+                    "4. Overtrading signals (too many trades in short periods)\n"
+                    "5. Emotional patterns (revenge trading, FOMO)\n"
+                    "6. Strategy-specific performance\n"
+                    "7. Actionable improvement suggestions\n"
+                    "Be specific with numbers."
+                ),
+            ),
+        ]
+        response = await self.provider.generate(messages, max_tokens=2048)
+        analysis = AIAnalysis(
+            user_id=user_id,
+            symbol="JOURNAL",
+            timeframe="ALL",
+            kind="journal",
+            input_json=trades_json[:2000],
+            output_json=json.dumps({"content": response.content}),
+            model=response.model,
+        )
+        self._db.add(analysis)
+        self._db.commit()
         return response.content
 
     # -------------------------------------------------------- chart explainer
