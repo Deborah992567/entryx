@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import time
+
 from fastapi import APIRouter, Depends
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -17,6 +19,7 @@ from app.ws.manager import manager
 router = APIRouter(tags=["system"])
 
 APP_VERSION = "0.1.0"
+_start_time = time.monotonic()
 
 
 def active_brokers() -> list[BrokerAccount]:
@@ -37,6 +40,7 @@ def _db_status() -> ComponentStatus:
 @router.get("/health", response_model=HealthOut)
 def health() -> HealthOut:
     db = _db_status()
+    uptime = round(time.monotonic() - _start_time, 1)
     components = {
         "database": db,
         "market_data": ComponentStatus(
@@ -51,6 +55,7 @@ def health() -> HealthOut:
         status=overall,
         app="EntryX",
         version=APP_VERSION,
+        uptime_seconds=uptime,
         components=components,
     )
 
@@ -59,6 +64,7 @@ def health() -> HealthOut:
 def system_status(_db: Session = Depends(get_db), _user: User = Depends(get_current_user)) -> dict:
     return {
         "app": APP_VERSION,
+        "uptime_seconds": round(time.monotonic() - _start_time, 1),
         "components": {
             "database": _db_status().status,
             "market_data": "ok",

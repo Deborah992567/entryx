@@ -16,4 +16,5 @@ class HealthOut(BaseModel):
     status: str
     app: str
     version: str
+    uptime_seconds: float | None = None
     components: dict[str, ComponentStatus]
