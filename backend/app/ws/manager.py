@@ -94,6 +94,14 @@ class ConnectionManager:
             except Exception:  # pragma: no cover - dropped client
                 pass
 
+    async def heartbeat_all(self) -> None:
+        """Send ping to all connected clients to detect stale connections."""
+        for cid, ws in list(self._connections.items()):
+            try:
+                await ws.send_text(json.dumps({"type": "ping", "ts": time.time()}))
+            except Exception:
+                self.disconnect(cid)
+
     # -- metrics ---------------------------------------------------------------
 
     def stats(self) -> dict:
