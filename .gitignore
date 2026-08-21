@@ -18,3 +18,17 @@ build/
 coverage/
 .DS_Store
 *.log
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Testing
+backend/.coverage
+backend/coverage.xml
+
+# OS
+Thumbs.db
