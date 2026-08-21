@@ -57,21 +57,21 @@ class BacktestMetricsOut(BaseModel):
 
 
 class BacktestTradeOut(BaseModel):
-    id: str
-    symbol: str
-    side: str
-    volume: float
-    open_price: float
-    close_price: float
-    gross_pnl: float
-    net_pnl: float
-    commission: float
-    swap: float
-    opened_at: datetime
-    closed_at: datetime
-    open_bar: int | None = None
-    close_bar: int | None = None
-    magic: int = 0
+    id: str = Field(description="Unique trade identifier")
+    symbol: str = Field(description="Trading symbol")
+    side: str = Field(description="Trade direction: buy or sell")
+    volume: float = Field(description="Trade volume in lots")
+    open_price: float = Field(description="Trade entry price")
+    close_price: float = Field(description="Trade exit price")
+    gross_pnl: float = Field(description="Gross profit/loss before fees")
+    net_pnl: float = Field(description="Net profit/loss after commission and swap")
+    commission: float = Field(description="Total commission charged")
+    swap: float = Field(description="Total swap/rollover charged")
+    opened_at: datetime = Field(description="Trade open timestamp")
+    closed_at: datetime = Field(description="Trade close timestamp")
+    open_bar: int | None = Field(default=None, description="Bar index when trade opened")
+    close_bar: int | None = Field(default=None, description="Bar index when trade closed")
+    magic: int = Field(default=0, description="Expert advisor magic number")
 
 
 class BacktestResultOut(BaseModel):
@@ -90,16 +90,16 @@ class BacktestResultOut(BaseModel):
 
 
 class OptimizationRun(BaseModel):
-    strategy: str = Field(min_length=1, max_length=64)
-    symbol: str = Field(min_length=1, max_length=32)
-    timeframe: str = "H1"
-    candle_count: int = Field(default=1000, ge=10, le=50_000)
-    start_ts: datetime | None = None
-    end_ts: datetime | None = None
-    metric: str = "net_profit"
-    top_n: int = Field(default=20, ge=1, le=200)
-    param_ranges: dict[str, dict[str, Any]]
-    config: BacktestConfigIn = Field(default_factory=BacktestConfigIn)
+    strategy: str = Field(min_length=1, max_length=64, description="Strategy name to optimize")
+    symbol: str = Field(min_length=1, max_length=32, description="Trading symbol")
+    timeframe: str = Field(default="H1", description="Candle timeframe")
+    candle_count: int = Field(default=1000, ge=10, le=50_000, description="Number of candles for optimization")
+    start_ts: datetime | None = Field(default=None, description="Backtest start time (None = use all candles)")
+    end_ts: datetime | None = Field(default=None, description="Backtest end time (None = current)")
+    metric: str = Field(default="net_profit", description="Metric to optimize (net_profit, sharpe, profit_factor, etc)")
+    top_n: int = Field(default=20, ge=1, le=200, description="Number of top results to return")
+    param_ranges: dict[str, dict[str, Any]] = Field(description="Parameter search ranges, e.g. {\"sl_pips\": {\"min\": 10, \"max\": 100, \"step\": 10}}")
+    config: BacktestConfigIn = Field(default_factory=BacktestConfigIn, description="Backtest configuration")
 
 
 class OptimizationEntryOut(BaseModel):
