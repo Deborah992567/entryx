@@ -61,4 +61,21 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
-    return Settings()
+    settings = Settings()
+    _validate_settings(settings)
+    return settings
+
+
+def _validate_settings(settings: Settings) -> None:
+    """Validate critical settings at startup to prevent runtime surprises."""
+    import logging
+
+    logger = logging.getLogger("entryx.config")
+    if settings.secret_key == "dev-only-change-me-please-use-64-char-key-in-prod":
+        logger.warning(
+            "SECRET_KEY is using the default dev value — set a real secret in production"
+        )
+    if not settings.encryption_key:
+        logger.warning("ENCRYPTION_KEY is empty — broker credential encryption is disabled")
+    if settings.database_url.startswith("sqlite"):
+        logger.info("Using SQLite database — suitable for development only")
