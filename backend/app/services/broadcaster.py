@@ -14,13 +14,14 @@ from app.services import trading_service
 from app.services.market_data import format_quote, market_data, next_quote
 from app.ws.manager import manager
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("entryx.broadcaster")
 
 TICK_INTERVAL_S = 1.0
 CANDLE_INTERVAL_S = 5.0
 
 
 async def _market_tick_loop() -> None:
+    logger.info("Market tick loop started (interval=%.1fs)", TICK_INTERVAL_S)
     while True:
         for info in market_data.symbols():
             channel = f"market.{info.symbol}"
@@ -35,12 +36,13 @@ async def _market_tick_loop() -> None:
 
 
 async def _candle_loop() -> None:
+    logger.info("Candle loop started (interval=%.1fs)", CANDLE_INTERVAL_S)
     while True:
         for channel in manager.active_channels():
             if not channel.startswith("candles."):
                 continue
             parts = channel.split(".")
-            if len(parts) != 3:  # candles.<symbol>.<tf>
+            if len(parts) != 3:
                 continue
             _, symbol, tf = parts
             candle = market_data.candles(symbol, tf, 1)[-1]
