@@ -30,9 +30,19 @@ class JsonFormatter(logging.Formatter):
         return json.dumps(payload, default=str)
 
 
+class RedactingFilter(logging.Filter):
+    """Redact sensitive fields from log records."""
+
+    SENSITIVE_KEYS = {"password", "secret", "token", "authorization", "api_key", "access_token"}
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        return True
+
+
 def setup_logging(level: str = "INFO") -> None:
     handler = logging.StreamHandler(sys.stdout)
     handler.setFormatter(JsonFormatter())
+    handler.addFilter(RedactingFilter())
     root = logging.getLogger()
     root.handlers = [handler]
     root.setLevel(level.upper())
