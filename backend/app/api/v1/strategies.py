@@ -21,14 +21,14 @@ from app.services.strategy import strategy_engine
 router = APIRouter(prefix="/strategies", tags=["strategies"])
 
 
-@router.get("", response_model=list[StrategyInfoOut])
+@router.get("", response_model=list[StrategyInfoOut], summary="List available strategies")
 def list_strategies(
     _user: User = Depends(get_current_user), _db: Session = Depends(get_db)
 ) -> list[dict]:
     return strategy_engine.catalog()
 
 
-@router.get("/instances", response_model=list[StrategyInstanceOut])
+@router.get("/instances", response_model=list[StrategyInstanceOut], summary="List running strategy instances")
 def list_instances(
     user: User = Depends(get_current_user), _db: Session = Depends(get_db)
 ) -> list[dict]:
