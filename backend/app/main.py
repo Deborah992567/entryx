@@ -31,6 +31,9 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title=settings.app_name,
         version="0.1.0",
+        description="EntryX trading terminal API — real-time market data, paper trading, AI copilot",
+        docs_url="/docs",
+        redoc_url="/redoc",
         lifespan=lifespan,
     )
 
