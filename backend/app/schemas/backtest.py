@@ -9,13 +9,13 @@ from pydantic import BaseModel, Field
 
 
 class BacktestConfigIn(BaseModel):
-    initial_balance: float = Field(default=100_000, ge=100, le=1_000_000_000)
-    leverage: int = Field(default=100, ge=1, le=1000)
-    commission_bps: float = Field(default=2.0, ge=0, le=1000)
-    slippage_points: float = Field(default=0.0, ge=0, le=1_000_000)
-    spread_mult: float = Field(default=1.0, ge=0, le=100)
-    swap_enabled: bool = True
-    margin_enabled: bool = True
+    initial_balance: float = Field(default=100_000, ge=100, le=1_000_000_000, description="Starting account balance")
+    leverage: int = Field(default=100, ge=1, le=1000, description="Account leverage multiplier")
+    commission_bps: float = Field(default=2.0, ge=0, le=1000, description="Commission in basis points")
+    slippage_points: float = Field(default=0.0, ge=0, le=1_000_000, description="Slippage in points")
+    spread_mult: float = Field(default=1.0, ge=0, le=100, description="Spread multiplier (1.0 = normal)")
+    swap_enabled: bool = Field(default=True, description="Enable overnight swap/rollover charges")
+    margin_enabled: bool = Field(default=True, description="Enable margin calculations")
 
 
 class BacktestRun(BaseModel):
