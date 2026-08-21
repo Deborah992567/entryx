@@ -103,31 +103,31 @@ class OptimizationRun(BaseModel):
 
 
 class OptimizationEntryOut(BaseModel):
-    rank: int
-    params: dict[str, Any]
-    metrics: BacktestMetricsOut
+    rank: int = Field(description="Ranking position (1 = best)")
+    params: dict[str, Any] = Field(description="Parameter combination used")
+    metrics: BacktestMetricsOut = Field(description="Backtest results for this combination")
 
 
 class OptimizationWalkForwardOut(BaseModel):
-    first_half: BacktestMetricsOut
-    second_half: BacktestMetricsOut
+    first_half: BacktestMetricsOut = Field(description="Metrics from the first half of data (in-sample)")
+    second_half: BacktestMetricsOut = Field(description="Metrics from the second half of data (out-of-sample)")
 
 
 class OptimizationResultOut(BaseModel):
-    id: str
-    strategy: str
-    symbol: str
-    timeframe: str
-    candle_count: int
-    metric: str
-    top_n: int
-    combinations: int
-    started_at: datetime
-    finished_at: datetime
-    config: dict
-    overfit_score: float
-    overfit_label: str
-    warnings: list[str]
-    walk_forward: OptimizationWalkForwardOut | None = None
-    best: dict[str, Any]
-    results: list[OptimizationEntryOut]
+    id: str = Field(description="Unique optimization run identifier")
+    strategy: str = Field(description="Strategy name")
+    symbol: str = Field(description="Trading symbol")
+    timeframe: str = Field(description="Candle timeframe")
+    candle_count: int = Field(description="Number of candles used")
+    metric: str = Field(description="Optimization target metric")
+    top_n: int = Field(description="Number of top results requested")
+    combinations: int = Field(description="Total parameter combinations tested")
+    started_at: datetime = Field(description="Optimization start timestamp")
+    finished_at: datetime = Field(description="Optimization end timestamp")
+    config: dict = Field(description="Backtest configuration used")
+    overfit_score: float = Field(description="Overfit score (0.0 = no overfit, 1.0 = severe overfit)")
+    overfit_label: str = Field(description="Human-readable overfit risk: low, medium, high")
+    warnings: list[str] = Field(description="Optimization warnings and recommendations")
+    walk_forward: OptimizationWalkForwardOut | None = Field(default=None, description="Walk-forward analysis results")
+    best: dict[str, Any] = Field(description="Best parameter combination summary")
+    results: list[OptimizationEntryOut] = Field(description="All ranked optimization results")
