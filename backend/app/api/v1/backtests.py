@@ -28,7 +28,7 @@ from app.services.optimization import (
 router = APIRouter(prefix="/backtests", tags=["backtests"])
 
 
-@router.post("", response_model=BacktestResultOut, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=BacktestResultOut, status_code=status.HTTP_201_CREATED, summary="Run a backtest")
 def create_backtest(
     body: BacktestRun,
     _user: User = Depends(get_current_user),
@@ -63,7 +63,7 @@ def create_backtest(
     return backtest_store.save(_user.id, result)
 
 
-@router.get("/{backtest_id}", response_model=BacktestResultOut)
+@router.get("/{backtest_id}", response_model=BacktestResultOut, summary="Get backtest result by ID")
 def get_backtest(
     backtest_id: str,
     user: User = Depends(get_current_user),
@@ -75,7 +75,7 @@ def get_backtest(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
 
-@router.post("/optimize", response_model=OptimizationResultOut, status_code=status.HTTP_201_CREATED)
+@router.post("/optimize", response_model=OptimizationResultOut, status_code=status.HTTP_201_CREATED, summary="Run parameter optimization")
 def optimize_backtest(
     body: OptimizationRun,
     user: User = Depends(get_current_user),
@@ -114,7 +114,7 @@ def optimize_backtest(
     return optimization_store.save(user.id, result)
 
 
-@router.get("/optimize/{optimization_id}", response_model=OptimizationResultOut)
+@router.get("/optimize/{optimization_id}", response_model=OptimizationResultOut, summary="Get optimization result by ID")
 def get_optimization(
     optimization_id: str,
     user: User = Depends(get_current_user),
