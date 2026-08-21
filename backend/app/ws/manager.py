@@ -121,6 +121,7 @@ class ConnectionManager:
             "connections": len(self._connections),
             "channels": len(self._channels),
             "users": len(self._user_connections),
+            "active_subscriptions": sum(len(s) for s in self._channels.values()),
         }
 
 
