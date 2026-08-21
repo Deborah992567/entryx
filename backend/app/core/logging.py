@@ -33,9 +33,23 @@ class JsonFormatter(logging.Formatter):
 class RedactingFilter(logging.Filter):
     """Redact sensitive fields from log records."""
 
-    SENSITIVE_KEYS = {"password", "secret", "token", "authorization", "api_key", "access_token"}
+    SENSITIVE_PATTERNS = [
+        "password",
+        "secret",
+        "token",
+        "authorization",
+        "api_key",
+        "access_token",
+        "encryption_key",
+    ]
 
     def filter(self, record: logging.LogRecord) -> bool:
+        if isinstance(record.msg, str):
+            for pattern in self.SENSITIVE_PATTERNS:
+                idx = record.msg.lower().find(pattern)
+                if idx != -1:
+                    record.msg = record.msg[:idx + len(pattern)] + "=[REDACTED]"
+                    break
         return True
 
 
