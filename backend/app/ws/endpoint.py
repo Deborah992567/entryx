@@ -46,6 +46,16 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
 
     await manager.connect(connection_id, websocket)
     manager.track_user(connection_id, user_id)
+    await manager.send(
+        connection_id,
+        {
+            "type": "system.connected",
+            "channel": "system",
+            "data": {"connection_id": connection_id, "user_id": user_id},
+            "ts": time.time(),
+            "seq": 0,
+        },
+    )
     try:
         while True:
             raw = await websocket.receive_text()
