@@ -63,6 +63,10 @@ def create_app() -> FastAPI:
     def root() -> dict:
         return {"app": settings.app_name, "docs": "/docs", "health": "/api/v1/health"}
 
+    @app.get("/version")
+    def version() -> dict:
+        return {"version": "0.1.0", "app": settings.app_name}
+
     return app
 
 
