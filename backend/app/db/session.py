@@ -14,10 +14,14 @@ from sqlalchemy.orm import Session, sessionmaker
 
 settings = get_settings()
 
+_pool_kwargs: dict = {"pool_pre_ping": True}
+if not settings.is_sqlite:
+    _pool_kwargs.update({"pool_size": 10, "max_overflow": 20, "pool_recycle": 3600})
+
 engine = create_engine(
     settings.database_url,
     echo=False,
-    pool_pre_ping=True,
+    **_pool_kwargs,
     connect_args=settings.database_connect_args,
 )
 
