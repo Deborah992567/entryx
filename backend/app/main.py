@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -16,6 +17,8 @@ from app.services import broadcaster
 from app.ws import endpoint
 from app.ws.manager import manager
 
+logger = logging.getLogger("entryx.startup")
+
 
 def create_app() -> FastAPI:
     settings = get_settings()
@@ -23,10 +26,13 @@ def create_app() -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(_: FastAPI):
+        logger.info("EntryX starting up — version 0.1.0")
         broadcast_task = broadcaster.start_broadcasters()
         yield
+        logger.info("EntryX shutting down — closing WS connections")
         broadcast_task.cancel()
         await manager.close_all()
+        logger.info("EntryX shutdown complete")
 
     app = FastAPI(
         title=settings.app_name,
