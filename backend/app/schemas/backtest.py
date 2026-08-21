@@ -35,25 +35,25 @@ class BacktestEquityPointOut(BaseModel):
 
 
 class BacktestMetricsOut(BaseModel):
-    start_balance: float
-    end_balance: float
-    net_profit: float
-    total_trades: int
-    winning_trades: int
-    losing_trades: int
-    breakeven_trades: int
-    win_rate: float
-    gross_profit: float
-    gross_loss: float
-    profit_factor: float | None = None
-    expectancy: float
-    avg_win: float
-    avg_loss: float
-    largest_win: float
-    largest_loss: float
-    max_drawdown: float
-    max_drawdown_pct: float
-    sharpe: float | None = None
+    start_balance: float = Field(description="Starting account balance")
+    end_balance: float = Field(description="Final account balance")
+    net_profit: float = Field(description="Net profit/loss")
+    total_trades: int = Field(description="Total number of trades executed")
+    winning_trades: int = Field(description="Number of profitable trades")
+    losing_trades: int = Field(description="Number of losing trades")
+    breakeven_trades: int = Field(description="Number of break-even trades")
+    win_rate: float = Field(description="Win rate as decimal (0.0-1.0)")
+    gross_profit: float = Field(description="Sum of all winning trade profits")
+    gross_loss: float = Field(description="Sum of all losing trade losses")
+    profit_factor: float | None = Field(default=None, description="Gross profit / gross loss ratio")
+    expectancy: float = Field(description="Expected profit per trade")
+    avg_win: float = Field(description="Average winning trade profit")
+    avg_loss: float = Field(description="Average losing trade loss")
+    largest_win: float = Field(description="Largest single winning trade")
+    largest_loss: float = Field(description="Largest single losing trade")
+    max_drawdown: float = Field(description="Maximum drawdown in account currency")
+    max_drawdown_pct: float = Field(description="Maximum drawdown as percentage")
+    sharpe: float | None = Field(default=None, description="Sharpe ratio")
 
 
 class BacktestTradeOut(BaseModel):
