@@ -8,17 +8,17 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class OrderCreate(BaseModel):
-    symbol: str = Field(min_length=1, max_length=32)
-    side: str
-    type: str = "market"
-    volume: float = Field(gt=0)
-    price: float | None = None
-    limit_price: float | None = None
-    sl: float | None = None
-    tp: float | None = None
-    magic: int = 0
-    comment: str = Field(default="", max_length=255)
-    expiry: datetime | None = None
+    symbol: str = Field(min_length=1, max_length=32, description="Trading symbol (e.g. EURUSD)")
+    side: str = Field(description="Order side: 'buy' or 'sell'")
+    type: str = Field(default="market", description="Order type: market, limit, stop, stop_limit")
+    volume: float = Field(gt=0, description="Position volume in lots")
+    price: float | None = Field(default=None, description="Price for limit/stop orders")
+    limit_price: float | None = Field(default=None, description="Limit price for stop_limit orders")
+    sl: float | None = Field(default=None, description="Stop-loss price")
+    tp: float | None = Field(default=None, description="Take-profit price")
+    magic: int = Field(default=0, description="Expert advisor magic number")
+    comment: str = Field(default="", max_length=255, description="Order comment")
+    expiry: datetime | None = Field(default=None, description="Pending order expiry time")
 
     @field_validator("side", "type")
     @classmethod
