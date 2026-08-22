@@ -4,6 +4,7 @@ library;
 import 'package:flutter/foundation.dart';
 
 import '../../core/api_client.dart';
+import '../../core/api_exception.dart';
 import '../../core/models.dart';
 import '../../core/token_store.dart';
 import '../../core/ws_client.dart';
@@ -74,6 +75,9 @@ class AuthStore extends ChangeNotifier {
       _status = AuthStatus.authenticated;
       _ws.connect();
       return true;
+    } on ApiException catch (e) {
+      _error = e.message;
+      return false;
     } on Exception catch (e) {
       _error = e.toString();
       return false;
@@ -94,6 +98,9 @@ class AuthStore extends ChangeNotifier {
         auth: false,
       );
       return await login(email, password);
+    } on ApiException catch (e) {
+      _error = e.message;
+      return false;
     } on Exception catch (e) {
       _error = e.toString();
       return false;

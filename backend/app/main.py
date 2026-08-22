@@ -26,6 +26,12 @@ def create_app() -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(_: FastAPI):
+        if settings.is_sqlite:
+            from app.db.base import Base
+            from app.db.session import engine
+
+            import app.db.models  # noqa: F401 — ensure all models are registered
+            Base.metadata.create_all(bind=engine)
         logger.info("EntryX starting up — version 0.1.0")
         broadcast_task = broadcaster.start_broadcasters()
         yield
