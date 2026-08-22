@@ -109,3 +109,33 @@ def test_access_token_with_extra_claims() -> None:
     assert payload["role"] == "admin"
     assert payload["email"] == "a@b.com"
     assert payload["sub"] == "user:42"
+
+
+def test_expired_token_rejected() -> None:
+    from datetime import UTC, datetime, timedelta
+
+    s = _settings()
+    payload = {
+        "sub": "1",
+        "type": TOKEN_TYPE_ACCESS,
+        "iat": datetime.now(UTC) - timedelta(hours=2),
+        "exp": datetime.now(UTC) - timedelta(hours=1),
+    }
+    token = jwt.encode(payload, s.secret_key.encode(), algorithm=JWT_ALGORITHM)
+    with pytest.raises(jwt.ExpiredSignatureError):
+        decode_access_token(token, s)
+
+
+def test_future_token_rejected() -> None:
+    from datetime import UTC, datetime, timedelta
+
+    s = _settings()
+    payload = {
+        "sub": "1",
+        "type": TOKEN_TYPE_ACCESS,
+        "iat": datetime.now(UTC) + timedelta(hours=1),
+        "exp": datetime.now(UTC) + timedelta(hours=2),
+    }
+    token = jwt.encode(payload, s.secret_key.encode(), algorithm=JWT_ALGORITHM)
+    with pytest.raises(jwt.InvalidTokenError):
+        decode_access_token(token, s)
