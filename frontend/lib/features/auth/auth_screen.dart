@@ -31,6 +31,29 @@ class _AuthScreenState extends State<AuthScreen> {
     super.dispose();
   }
 
+  String? _validateEmail(String? v) {
+    if (v == null || v.trim().isEmpty) return 'Email is required';
+    if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(v.trim())) {
+      return 'Enter a valid email';
+    }
+    return null;
+  }
+
+  String? _validatePassword(String? v) {
+    if (v == null || v.isEmpty) return 'Password is required';
+    if (v.length < 8) return 'Password must be at least 8 characters';
+    if (!RegExp(r'[A-Za-z]').hasMatch(v) || !RegExp(r'[0-9]').hasMatch(v)) {
+      return 'Password must contain a letter and a digit';
+    }
+    return null;
+  }
+
+  String? _validateName(String? v) {
+    if (v == null || v.trim().isEmpty) return 'Name is required';
+    if (v.trim().length < 2) return 'Name must be at least 2 characters';
+    return null;
+  }
+
   Future<void> _submit() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
     final ok = _registerMode
@@ -83,24 +106,29 @@ class _AuthScreenState extends State<AuthScreen> {
                     const Text('Professional trading terminal · local AI',
                         style: TextStyle(fontSize: 11, color: EntryXColors.textDim)),
                     const SizedBox(height: 24),
-                    TextField(
+                    TextFormField(
                       controller: _email,
                       decoration: const InputDecoration(labelText: 'Email'),
                       keyboardType: TextInputType.emailAddress,
                       autocorrect: false,
+                      validator: _validateEmail,
+                      textInputAction: TextInputAction.next,
                     ),
                     const SizedBox(height: 12),
                     if (_registerMode) ...[
-                      TextField(
+                      TextFormField(
                         controller: _name,
                         decoration: const InputDecoration(labelText: 'Name'),
+                        validator: _validateName,
+                        textInputAction: TextInputAction.next,
                       ),
                       const SizedBox(height: 12),
                     ],
-                    TextField(
+                    TextFormField(
                       controller: _password,
                       decoration: InputDecoration(
                         labelText: 'Password',
+                        helperText: _registerMode ? 'Min 8 chars, letter + digit' : null,
                         suffixIcon: IconButton(
                           icon: Icon(_obscure ? Icons.visibility_off : Icons.visibility,
                               size: 16, color: EntryXColors.textDim),
@@ -108,7 +136,9 @@ class _AuthScreenState extends State<AuthScreen> {
                         ),
                       ),
                       obscureText: _obscure,
-                      onSubmitted: (_) => _submit(),
+                      validator: _validatePassword,
+                      textInputAction: TextInputAction.done,
+                      onFieldSubmitted: (_) => _submit(),
                     ),
                     const SizedBox(height: 20),
                     FilledButton(
