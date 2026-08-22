@@ -14,6 +14,8 @@ def _token(user_id: int = 1) -> str:
 
 def test_ws_receives_market_tick(client):
     with client.websocket_connect(f"/ws?token={_token()}") as ws:
+        msg = ws.receive_json()
+        assert msg["type"] == "system.connected"
         ws.send_json({"action": "subscribe", "channels": ["market.EURUSD"]})
         while True:
             msg = ws.receive_json()
@@ -30,6 +32,8 @@ def test_ws_receives_market_tick(client):
 
 def test_ws_receives_candle_event(client):
     with client.websocket_connect(f"/ws?token={_token()}") as ws:
+        msg = ws.receive_json()
+        assert msg["type"] == "system.connected"
         ws.send_json({"action": "subscribe", "channels": ["candles.XAUUSD.M1"]})
         while True:
             msg = ws.receive_json()
@@ -46,6 +50,8 @@ def test_ws_receives_candle_event(client):
 
 def test_ws_receives_market_snapshot(client):
     with client.websocket_connect(f"/ws?token={_token()}") as ws:
+        msg = ws.receive_json()
+        assert msg["type"] == "system.connected"
         ws.send_json({"action": "subscribe", "channels": ["market.watch"]})
         while True:
             msg = ws.receive_json()
@@ -62,6 +68,8 @@ def test_ws_receives_market_snapshot(client):
 def test_ws_receives_position_and_account_events(client, auth_headers):
     user_id = 1
     with client.websocket_connect(f"/ws?token={_token(user_id=user_id)}") as ws:
+        msg = ws.receive_json()
+        assert msg["type"] == "system.connected"
         ws.send_json(
             {
                 "action": "subscribe",
