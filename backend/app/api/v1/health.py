@@ -48,7 +48,7 @@ def health() -> HealthOut:
             detail={"provider": "simulated", "symbols": len(market_data.symbols())},
         ),
         "broker": ComponentStatus(status="ok", detail={"accounts": len(active_brokers())}),
-        "ai": ComponentStatus(status="degraded", detail="AI provider not started (Phase 7)"),
+        "ai": ComponentStatus(status="degraded", detail="AI provider not configured"),
     }
     overall = "ok" if all(c.status == "ok" for c in components.values()) else "degraded"
     return HealthOut(
