@@ -60,6 +60,48 @@ ollama list
 5. Enable HTTPS
 6. Run Ollama as a systemd service
 
+## Docker Deployment
+
+```bash
+# Build and start all services
+docker compose up -d --build
+
+# Check status
+docker compose ps
+
+# View logs
+docker compose logs -f backend
+
+# Stop
+docker compose down
+```
+
+### Docker Compose Services
+
+| Service | Port | Description |
+|---------|------|-------------|
+| backend | 8000 | FastAPI REST + WebSocket |
+| ollama | 11434 | Local AI inference |
+
+### Building Docker Image
+
+```bash
+docker build -t entryx-backend .
+docker run -p 8000:8000 -e SECRET_KEY=your-key entryx-backend
+```
+
+## Production Checklist
+
+- [ ] Set `SECRET_KEY` to a 64-char random string
+- [ ] Set `ENCRYPTION_KEY` for broker credential encryption
+- [ ] Use MariaDB/PostgreSQL instead of SQLite
+- [ ] Enable HTTPS via reverse proxy
+- [ ] Configure CORS for your frontend domain
+- [ ] Set log level to WARNING or ERROR
+- [ ] Monitor health endpoint at `/api/v1/health`
+- [ ] Set up Ollama as systemd service
+- [ ] Configure firewall to restrict access
+
 ## Desktop Packaging
 
 EntryX uses Flutter for desktop. Build release bundles:
