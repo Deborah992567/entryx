@@ -56,7 +56,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         if len(self._requests[client_ip]) >= self.max_requests:
             return JSONResponse(
                 status_code=429,
-                content={"detail": "Rate limit exceeded. Try again later."},
+                content={"detail": {"code": "ERR_RATE_LIMITED", "message": "Rate limit exceeded. Try again later."}},
             )
 
         remaining = max(0, self.max_requests - len(self._requests[client_ip]))
