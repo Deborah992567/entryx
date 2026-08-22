@@ -26,6 +26,8 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["Content-Security-Policy"] = "default-src 'self'"
         response.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains"
         response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+        response.headers["X-API-Version"] = "1"
+        response.headers["X-Powered-By"] = "EntryX"
         return response
 
 
