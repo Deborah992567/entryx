@@ -1,4 +1,4 @@
-"""Model registry — import all models so Base.metadata (and Alembic) sees them."""
+"""Models package — exports all SQLAlchemy model classes for convenient imports."""
 
 from app.db.models.ai import AIAnalysis, AIConversation, AIMessage
 from app.db.models.alerts import Alert
