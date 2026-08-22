@@ -7,6 +7,7 @@ library;
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:web_socket_channel/web_socket_channel.dart';
 
@@ -29,15 +30,16 @@ class WsClient {
   ConnectionStatus _status = ConnectionStatus.disconnected;
   void Function()? onAuthExpired;
   bool _disposed = false;
+  int _reconnectAttempts = 0;
+  static const int _maxBackoffSeconds = 60;
 
   ConnectionStatus get status => _status;
+  int get reconnectAttempts => _reconnectAttempts;
 
-  /// Subscribe to an event type (wildcard matching handled by listeners).
   void on(String type, void Function(Map<String, dynamic> event) handler) {
     _listeners.putIfAbsent(type, () => []).add(handler);
   }
 
-  /// Register a listener for connection-status changes (multiple allowed).
   void addStatusListener(void Function(ConnectionStatus) listener) {
     _statusListeners.add(listener);
   }
@@ -59,6 +61,7 @@ class WsClient {
         onDone: _handleDrop,
         cancelOnError: true,
       );
+      _reconnectAttempts = 0;
       _setStatus(ConnectionStatus.connected);
     } catch (_) {
       _scheduleReconnect();
@@ -105,7 +108,12 @@ class WsClient {
 
   void _scheduleReconnect() {
     _reconnectTimer?.cancel();
-    _reconnectTimer = Timer(const Duration(seconds: 3), connect);
+    final delay = math.min(
+      _maxBackoffSeconds,
+      math.pow(2, _reconnectAttempts).toInt(),
+    );
+    _reconnectAttempts++;
+    _reconnectTimer = Timer(Duration(seconds: delay), connect);
   }
 
   void _setStatus(ConnectionStatus status) {
