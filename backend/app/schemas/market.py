@@ -22,21 +22,21 @@ class SymbolOut(BaseModel):
 
 
 class CandleOut(BaseModel):
-    symbol: str
-    timeframe: str
-    ts: datetime
-    o: float
-    h: float
-    low: float = Field(alias="l")  # serialized as `l` to match the event contract
-    c: float
-    v: float
+    symbol: str = Field(description="Trading symbol")
+    timeframe: str = Field(description="Candle timeframe")
+    ts: datetime = Field(description="Candle timestamp")
+    o: float = Field(description="Open price")
+    h: float = Field(description="High price")
+    low: float = Field(alias="l", description="Low price")
+    c: float = Field(description="Close price")
+    v: float = Field(description="Volume")
 
 
 class QuoteOut(BaseModel):
-    symbol: str
-    ts: datetime
-    bid: float
-    ask: float
-    spread: float
-    change_pct: float
-    volume: float
+    symbol: str = Field(description="Trading symbol")
+    ts: datetime = Field(description="Quote timestamp")
+    bid: float = Field(description="Bid price")
+    ask: float = Field(description="Ask price")
+    spread: float = Field(description="Bid-ask spread")
+    change_pct: float = Field(description="Price change percentage")
+    volume: float = Field(description="Trading volume")
