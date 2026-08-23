@@ -89,8 +89,10 @@ Legend: `[x]` done · `[~]` in progress · `[ ]` planned
 ## PHASE 10 — Hardening
 
 - [x] Full unit/integration/API/WS/db/security test matrix
-- [ ] Performance: chart rendering, backtest speed, WS fan-out
-- [ ] Packaging (Tauri desktop bundle, installer), deployment docs
+- [x] Performance benchmarks (`backend/benchmarks/perf_bench.py`): chart geometry,
+  backtest speed (500–5000 bars), WS fan-out (100/500 clients), indicators, SMC detection
+- [x] Packaging: cross-platform Flutter desktop build script (`scripts/build_desktop.sh`),
+  macOS DMG packager (`scripts/package_macos.sh`), deployment docs
 
 ---
 
@@ -113,4 +115,4 @@ Legend: `[x]` done · `[~]` in progress · `[ ]` planned
 | 7 | Local AI infrastructure | done |
 | 8 | AI applications | done |
 | 9 | Broker adapters + live safeguards | done |
-| 10 | Hardening + packaging | planned |
+| 10 | Hardening + packaging | done |
