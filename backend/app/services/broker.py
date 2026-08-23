@@ -351,6 +351,7 @@ class PaperBroker(BrokerAdapter):
         open_commission = round(position.commission * volume / position.volume, 2)
         swap = self._swap_for(position, volume, at)
         net = round(gross - close_commission - open_commission - swap, 2)
+        settled = round(gross - close_commission - swap, 2)
         trade = ClosedTrade(
             id=_new_id("t"),
             symbol=position.symbol,
@@ -364,7 +365,7 @@ class PaperBroker(BrokerAdapter):
             swap=swap,
             closed_at=at,
         )
-        self._account.balance = round(self._account.balance + net, 2)
+        self._account.balance = round(self._account.balance + settled, 2)
         self._commission_total = round(self._commission_total + close_commission, 2)
         if volume >= position.volume:
             del self._positions[position_id]

@@ -18,7 +18,7 @@ from app.ws.manager import manager
 
 router = APIRouter(tags=["system"])
 
-APP_VERSION = "0.1.0"
+APP_VERSION = "0.9.0"
 _start_time = time.monotonic()
 
 

@@ -437,6 +437,28 @@ def test_commission_and_exposure_after_open() -> None:
     assert broker.commission_total() > 0
 
 
+def test_round_trip_balance_matches_realized_pnl() -> None:
+    broker = PaperBroker(FakeProvider(1.09))
+    start = broker.account().balance
+    order = broker.place_order(
+        OrderRequest(symbol="EURUSD", side="buy", type="market", volume=1.0)
+    )
+    position = broker.open_positions()[0]
+    open_commission = broker.account().balance - start
+    assert open_commission < 0
+
+    trade = broker.close_position(position.id)
+    final = broker.account().balance
+    lifecycle = round(final - start, 2)
+
+    assert lifecycle == pytest.approx(trade.net_pnl)
+    assert trade.gross_pnl - trade.commission - abs(open_commission) == pytest.approx(
+        trade.net_pnl, abs=0.02
+    )
+    assert broker.open_positions() == []
+    assert order.state == "filled"
+
+
 def test_swap_pnl_accrual() -> None:
     broker = PaperBroker(FakeProvider(1.09))
     broker.place_order(OrderRequest(symbol="EURUSD", side="buy", type="market", volume=1.0))
