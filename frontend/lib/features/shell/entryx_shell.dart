@@ -79,7 +79,7 @@ class _StatusBar extends StatelessWidget {
           SizedBox(width: 6),
           Text('Trading engine: Phase 4', style: TextStyle(fontSize: 10, color: EntryXColors.textDim)),
           Spacer(),
-          Text('EntryX v0.1.0 · Phase 1', style: TextStyle(fontSize: 10, color: EntryXColors.textDim)),
+          Text('EntryX v0.9.0 · Phase 10', style: TextStyle(fontSize: 10, color: EntryXColors.textDim)),
         ],
       ),
     );

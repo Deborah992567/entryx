@@ -32,7 +32,7 @@ def create_app() -> FastAPI:
 
             import app.db.models  # noqa: F401 — ensure all models are registered
             Base.metadata.create_all(bind=engine)
-        logger.info("EntryX starting up — version 0.1.0")
+        logger.info("EntryX starting up — version 0.9.0")
         broadcast_task = broadcaster.start_broadcasters()
         yield
         logger.info("EntryX shutting down — closing WS connections")
@@ -42,7 +42,7 @@ def create_app() -> FastAPI:
 
     app = FastAPI(
         title=settings.app_name,
-        version="0.1.0",
+        version="0.9.0",
         description="EntryX trading terminal API — real-time market data, paper trading, AI copilot",
         docs_url="/docs",
         redoc_url="/redoc",
@@ -71,7 +71,7 @@ def create_app() -> FastAPI:
 
     @app.get("/version")
     def version() -> dict:
-        return {"version": "0.1.0", "app": settings.app_name}
+        return {"version": "0.9.0", "app": settings.app_name}
 
     return app
 

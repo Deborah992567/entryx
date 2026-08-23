@@ -17,7 +17,7 @@ class AppConfig {
   }
 
   static const String appName = 'EntryX';
-  static const String appVersion = '0.1.0';
+  static const String appVersion = '0.9.0';
 
   static String apiPath(String path) => '$apiBaseUrl/api/v1$path';
 }
