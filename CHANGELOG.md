@@ -1,5 +1,20 @@
 # Changelog
 
+## v0.9.1 (2026-08-23) — Phase 10 Hardening Complete
+
+### Performance
+- Backtest speed benchmarks (500–5000 bars) with slippage/commission impact analysis
+- WS fan-out throughput benchmarks (100/500 clients) + serialization benchmarks
+- Chart geometry, indicator, and SMC detection benchmarks in `backend/benchmarks/perf_bench.py`
+- WS client: exponential backoff reconnect (1s→60s max) instead of fixed 3s
+
+### Frontend
+- App settings store persisted (theme mode, volume, spread, timeframe, candle count)
+
+### Packaging
+- Cross-platform Flutter desktop build script (`scripts/build_desktop.sh`: macOS/Linux/Windows)
+- macOS DMG packager (`scripts/package_macos.sh`, create-dmg with hdiutil fallback)
+
 ## v0.9.0 (2026-08-22) — Session Progress
 
 ### Bug Fixes
