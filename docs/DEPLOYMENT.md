@@ -104,14 +104,34 @@ docker run -p 8000:8000 -e SECRET_KEY=your-key entryx-backend
 
 ## Desktop Packaging
 
-EntryX uses Flutter for desktop. Build release bundles:
+EntryX uses Flutter for desktop. Build release bundles with the helper script
+(macOS / Linux / Windows auto-detected):
+
+```bash
+./scripts/build_desktop.sh
+```
+
+Or build directly:
 
 ```bash
 cd frontend
 flutter build macos    # macOS .app
-flutter build linux    # Linux AppImage
+flutter build linux    # Linux AppImage/binary
 flutter build windows  # Windows installer
 ```
+
+### macOS DMG Installer
+
+Package the built `.app` into a distributable DMG (requires
+`brew install create-dmg`; falls back to `hdiutil` automatically):
+
+```bash
+./scripts/package_macos.sh
+# Output: dist/EntryX-macos.dmg
+```
+
+Prerequisites: run the macOS Flutter build first so
+`frontend/build/macos/Build/Products/Release/EntryX.app` exists.
 
 ## Architecture
 
