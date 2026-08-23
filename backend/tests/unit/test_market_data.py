@@ -64,6 +64,14 @@ def test_quote_shape_and_spread() -> None:
     assert quote.spread == pytest.approx(quote.ask - quote.bid)
 
 
+def test_all_timeframes_end_at_same_price_as_quote() -> None:
+    quote = market_data.quote("XAUUSD")
+    mid = (quote.bid + quote.ask) / 2
+    for tf in ["M5", "M15", "H1", "H4", "D1"]:
+        series = market_data.candles("XAUUSD", tf, 30)
+        assert series[-1].c == pytest.approx(mid, abs=0.05), f"timeframe {tf}"
+
+
 def test_next_quote_is_close_to_deterministic_quote() -> None:
     base = market_data.quote("EURUSD")
     tick = next_quote("EURUSD")

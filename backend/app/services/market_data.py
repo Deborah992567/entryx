@@ -205,6 +205,8 @@ class SimulatedMarketDataProvider(MarketDataProvider):
             )
             out.append(candle)
             price = close
+
+        out = self._anchor_series(info.symbol, out)
         return out
 
     def quote(self, symbol: str, at: datetime | None = None) -> Quote:
@@ -224,6 +226,33 @@ class SimulatedMarketDataProvider(MarketDataProvider):
         )
 
     # -- helpers --------------------------------------------------------------
+
+    def _anchor_series(self, symbol: str, candles: list[Candle]) -> list[Candle]:
+        if not candles:
+            return candles
+        anchor_rng = random.Random(f"{symbol}:anchor")
+        anchor = self._base_price[symbol]
+        anchor *= self._start_factor(anchor_rng)
+        last_close = candles[-1].c
+        if last_close <= 0:
+            return candles
+        scale = anchor / last_close
+        if math.isclose(scale, 1.0, rel_tol=1e-12):
+            return candles
+        info = self.symbol_info(symbol)
+        return [
+            Candle(
+                symbol=c.symbol,
+                timeframe=c.timeframe,
+                ts=c.ts,
+                o=round(c.o * scale, info.digits),
+                h=round(c.h * scale, info.digits),
+                low=round(c.low * scale, info.digits),
+                c=round(c.c * scale, info.digits),
+                v=c.v,
+            )
+            for c in candles
+        ]
 
     @staticmethod
     def _start_factor(rng: random.Random) -> float:
