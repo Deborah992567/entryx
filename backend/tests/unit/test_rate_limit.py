@@ -4,9 +4,8 @@ from __future__ import annotations
 
 import time
 
-from starlette.testclient import TestClient
-
 from app.middleware import RateLimitMiddleware
+from starlette.testclient import TestClient
 
 
 def test_rate_limit_headers_present() -> None:
@@ -27,9 +26,6 @@ def test_rate_limit_429_after_abuse() -> None:
 
     RateLimitMiddleware.reset()
     client = TestClient(app, raise_server_exceptions=False)
-    mw = None
-    for mw_instance in app.user_middleware:
-        pass
     for _ in range(200):
         client.get("/api/v1/health")
     RateLimitMiddleware.reset()

@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-import math
-import time
 from datetime import UTC, datetime, timedelta
 
-from app.services.indicators import sma, ema, rsi, atr
+from app.services.indicators import atr, ema, rsi, sma
 from app.services.market_data import Candle
 
 

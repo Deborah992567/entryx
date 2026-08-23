@@ -3,12 +3,10 @@
 from __future__ import annotations
 
 import time
-from datetime import UTC, datetime, timedelta
 
-from app.services.indicators import adx, atr, bollinger, ema, macd, rsi, sma
+from app.services.indicators import bollinger, macd, rsi, sma
 from app.services.market_data import Candle, SimulatedMarketDataProvider
 from app.services.market_structure import analyze as analyze_structure
-from app.services.metrics import compute_metrics
 from app.services.risk_engine import RiskEngine
 from app.services.smc_objects import analyze_smc
 

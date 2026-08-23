@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-from starlette.testclient import TestClient
-
 from app.main import app
 from app.middleware import RateLimitMiddleware
+from starlette.testclient import TestClient
 
 
 def _auth_headers() -> dict:

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import pytest
-
 from app.services.market_data import market_data
 from app.services.risk_engine import RiskEngine, RiskLimits
 

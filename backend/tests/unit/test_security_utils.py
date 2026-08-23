@@ -6,7 +6,6 @@ import hashlib
 
 import jwt
 import pytest
-
 from app.core.config import Settings
 from app.core.security import (
     JWT_ALGORITHM,
@@ -29,7 +28,7 @@ def _settings() -> Settings:
 
 
 def test_sha256_hex() -> None:
-    expected = hashlib.sha256("hello".encode("utf-8")).hexdigest()
+    expected = hashlib.sha256(b"hello").hexdigest()
     assert sha256_hex("hello") == expected
 
 

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from app.db.models.audit import AuditLog
 from app.services import audit
 
 

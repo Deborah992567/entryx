@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import time
 
+from app.services.market_data import market_data
 from app.services.metrics import compute_metrics, max_drawdown, sharpe_ratio
 from app.services.risk_engine import RiskEngine, RiskLimits
-from app.services.market_data import market_data
 
 
 def test_max_drawdown_performance() -> None:

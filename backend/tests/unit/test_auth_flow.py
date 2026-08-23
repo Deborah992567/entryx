@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from starlette.testclient import TestClient
-
 from app.main import app
+from starlette.testclient import TestClient
 
 
 def test_full_auth_flow() -> None:
